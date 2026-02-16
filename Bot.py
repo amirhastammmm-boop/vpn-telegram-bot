@@ -1,15 +1,15 @@
 import telebot
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+import config
 
-TOKEN = "8443993110:AAHzAuITHbCuGfwA3_p0auvL2UM5bdnL2O0"
+bot = telebot.TeleBot(config.BOT_TOKEN)
 
-bot = telebot.TeleBot(TOKEN)
 
-# منوی اصلی
+# ساخت منو
 def main_menu():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
 
-    btn1 = KeyboardButton("🛒 خرید اشتراک")
+    btn1 = KeyboardButton("💳 خرید اشتراک")
     btn2 = KeyboardButton("📦 اشتراک های من")
     btn3 = KeyboardButton("📚 آموزش")
     btn4 = KeyboardButton("⭐ امتیاز")
@@ -26,29 +26,30 @@ def main_menu():
 def start(message):
     bot.send_message(
         message.chat.id,
-        "به ربات VPN خوش آمدید 🌐",
+        "سلام 👋\nبه ربات VPN خوش اومدی",
         reply_markup=main_menu()
     )
 
 
-@bot.message_handler(func=lambda message: True)
-def menu_handler(message):
+# دکمه ها
+@bot.message_handler(func=lambda m: True)
+def buttons(message):
 
-    if message.text == "🛒 خرید اشتراک":
+    if message.text == "💳 خرید اشتراک":
         bot.send_message(message.chat.id, "بخش خرید اشتراک")
 
     elif message.text == "📦 اشتراک های من":
-        bot.send_message(message.chat.id, "اشتراک های شما")
+        bot.send_message(message.chat.id, "لیست اشتراک های شما")
 
     elif message.text == "📚 آموزش":
         bot.send_message(message.chat.id, "آموزش استفاده")
 
     elif message.text == "⭐ امتیاز":
-        bot.send_message(message.chat.id, "امتیاز شما ثبت شد ❤️")
+        bot.send_message(message.chat.id, "امتیاز بده ❤️")
 
     elif message.text == "📞 پشتیبانی":
         bot.send_message(message.chat.id, "ارتباط با پشتیبانی")
 
 
-print("Bot is running...")
+print("Bot Started...")
 bot.infinity_polling()
