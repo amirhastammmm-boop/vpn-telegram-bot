@@ -1,0 +1,4 @@
+BOT_TOKEN = "8443993110:AAH08NXvjcKty2XBHH13ecD8l5giSCD-ZF4"
+
+ADMIN_ID = "Amnbytry"
+BOT_USERNAME = "PayydarVpn_robot"
