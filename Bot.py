@@ -28,26 +28,31 @@ CREATE TABLE IF NOT EXISTS subs(
 
 db.commit()
 
+
 # ===== کیبورد =====
 def main_keyboard():
     keyboard = [
         ["📦 اشتراک های من"],
-        ["⭐ امتیاز من"]
+        ["⭐ امتیاز من"],
+        ["🎁 خرید با امتیاز"]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+
+# ===== گرفتن امتیاز امن =====
+def get_score(user_id):
+    cursor.execute("SELECT score FROM users WHERE user_id=?", (user_id,))
+    data = cursor.fetchone()
+    return data[0] if data else 0
 
 
 # ===== ثبت کاربر + ضد تقلب =====
 def add_user(user_id, referrer=None):
 
-    # اگر قبلا ثبت شده
     cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
-    old_user = cursor.fetchone()
-
-    if old_user:
+    if cursor.fetchone():
         return
 
-    # جلوگیری از دعوت خود
     if referrer == user_id:
         referrer = None
 
@@ -56,16 +61,12 @@ def add_user(user_id, referrer=None):
         (user_id, referrer)
     )
 
-    # امتیاز دعوت فقط اگر کاربر جدید باشد
+    # امتیاز دعوت
     if referrer:
 
-        cursor.execute(
-            "SELECT invited FROM users WHERE user_id=?",
-            (user_id,)
-        )
+        cursor.execute("SELECT invited FROM users WHERE user_id=?", (user_id,))
         invited = cursor.fetchone()
 
-        # اگر قبلا دعوت نشده
         if invited is None or invited[0] == 0:
 
             cursor.execute(
@@ -90,13 +91,7 @@ def add_purchase_score(user_id, plan):
     if not ref or not ref[0]:
         return
 
-    if plan == 1:
-        score = 1
-    elif plan == 2:
-        score = 2
-    else:
-        score = 3
-
+    score = plan
     cursor.execute(
         "UPDATE users SET score = score + ? WHERE user_id=?",
         (score, ref[0])
@@ -126,7 +121,6 @@ def create_sub(user_id, plan):
     )
 
     db.commit()
-
     add_purchase_score(user_id, plan)
 
 
@@ -140,7 +134,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             ref = int(context.args[0])
         except:
-            ref = None
+            pass
 
     add_user(user_id, ref)
 
@@ -181,9 +175,7 @@ async def show_sub(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def score(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
-
-    cursor.execute("SELECT score FROM users WHERE user_id=?", (user_id,))
-    sc = cursor.fetchone()[0]
+    sc = get_score(user_id)
 
     referral = f"https://t.me/{config.BOT_USERNAME}?start={user_id}"
 
@@ -193,12 +185,9 @@ async def score(update: Update, context: ContextTypes.DEFAULT_TYPE):
 👥 لینک دعوت شما:
 {referral}
 
-قوانین:
 هر دعوت = ۱ امتیاز
-خرید زیرمجموعه:
-۱ ماه = ۱ امتیاز
-۲ ماه = ۲ امتیاز
-۳ ماه = ۳ امتیاز
+۱ ماه = ۵ امتیاز
+۲ ماه = ۱۰ امتیاز
 """
 
     await update.message.reply_text(text)
@@ -208,9 +197,7 @@ async def score(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def buy_with_score(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
-
-    cursor.execute("SELECT score FROM users WHERE user_id=?", (user_id,))
-    sc = cursor.fetchone()[0]
+    sc = get_score(user_id)
 
     if sc >= 10:
 
@@ -250,6 +237,9 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif text == "⭐ امتیاز من":
         await score(update, context)
+
+    elif text == "🎁 خرید با امتیاز":
+        await buy_with_score(update, context)
 
 
 # ===== اجرا =====
