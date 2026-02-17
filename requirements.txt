@@ -1,6 +1,2 @@
-python-telegram-bot==20.7
-flask
-gunicorn
-requests
-pytz
-schedule
+aiogram
+aiohttp
