@@ -1,117 +1,148 @@
-from telegram import ReplyKeyboardMarkup, Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
+)
+
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters
+)
 
 from config import TOKEN, ADMIN_ID
-from database import add_user, get_user
-from wireguard import create_wireguard_config
-from payments import PAYMENT_LINK
+
+from database import (
+    add_user,
+    get_user_subscriptions,
+    get_subscription_by_id,
+    add_test_subscription
+)
 
 
-# ===== منو اصلی =====
-main_menu = ReplyKeyboardMarkup([
-    ["📦 اشتراک های من", "💳 خرید اشتراک"],
-    ["🏆 امتیاز های من", "📚 آموزش ربات"],
-    ["🛠 پشتیبانی"]
-], resize_keyboard=True)
+# ---------------- منوی اصلی ----------------
+
+def main_menu():
+
+    keyboard = [
+        [KeyboardButton("💳 خرید اشتراک"), KeyboardButton("📦 اشتراک های من")],
+        [KeyboardButton("🏆 امتیاز های من"), KeyboardButton("📚 آموزش ربات")],
+        [KeyboardButton("🛠 پشتیبانی")]
+    ]
+
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
-# ===== استارت =====
+# ---------------- استارت ----------------
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    user_id = update.effective_user.id
+    user_id = update.message.from_user.id
+
     add_user(user_id)
 
-    await update.message.reply_text(
-        "👋 به ربات فروش VPN خوش اومدی",
-        reply_markup=main_menu
-    )
-
-
-# ===== اشتراک های من =====
-async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user = get_user(update.effective_user.id)
-
-    await update.message.reply_text(
-        f"📦 وضعیت اشتراک شما:\n\n{user[1]}"
-    )
-
-
-# ===== خرید اشتراک =====
-async def buy_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    await update.message.reply_text(
-        f"💳 برای خرید اشتراک روی لینک زیر بزن:\n{PAYMENT_LINK}\n\nبعد پرداخت /config رو بزن"
-    )
-
-
-# ===== ساخت کانفیگ =====
-async def send_config(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    config = create_wireguard_config(update.effective_user.id)
-
-    await update.message.reply_text(config)
-
-
-# ===== امتیاز =====
-async def my_points(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user = get_user(update.effective_user.id)
-
-    await update.message.reply_text(
-        f"🏆 امتیاز شما: {user[2]}"
-    )
-
-
-# ===== آموزش =====
-async def tutorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not get_user_subscriptions(user_id):
+        add_test_subscription(user_id)
 
     text = """
-📚 آموزش اتصال VPN
+♥️سلام دوست عزیز
 
-1️⃣ برنامه WireGuard نصب کن
-2️⃣ کانفیگ رو ایمپورت کن
-3️⃣ اتصال رو بزن
+به ربات پینگ خور خوش اومدی
+
+⬇️لطفا یک گزینه رو انتخاب کن
 """
 
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, reply_markup=main_menu())
 
 
-# ===== پشتیبانی =====
-async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ---------------- اشتراک های من ----------------
 
-    await update.message.reply_text(
-        f"🛠 برای پشتیبانی به ادمین پیام بده:\n\nID: {ADMIN_ID}"
-    )
+async def my_subscriptions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user_id = update.message.from_user.id
+    subs = get_user_subscriptions(user_id)
+
+    if not subs:
+        await update.message.reply_text("❌ شما هیچ اشتراکی ندارید")
+        return
+
+    for sub in subs:
+
+        sub_id = sub[0]
+        sub_number = sub[2]
+        sub_type = sub[3]
+        buy_date = sub[4]
+        total = sub[6]
+        used = sub[7]
+        status = sub[8]
+
+        text = f"""
+🎗شماره اشتراک: {sub_number}
+🎯نوع اشتراک: {sub_type}
+⏰تاریخ خرید: {buy_date}
+حجم مجاز: {total} مگابایت
+حجم مصرف شده: {used} مگابایت
+⚙️وضعیت: {status}
+
+(اطلاعات هر 4 ساعت یکبار بروزرسانی میشود)
+"""
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📥 دریافت مجدد کانفیگ", callback_data=f"getconfig_{sub_id}")]
+        ])
+
+        await update.message.reply_text(text, reply_markup=keyboard)
 
 
-# ===== هندل پیام =====
-async def menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ---------------- ارسال کانفیگ ----------------
 
-    text = update.message.text
+async def send_config(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    if text == "📦 اشتراک های من":
-        await my_subscription(update, context)
+    query = update.callback_query
+    await query.answer()
 
-    elif text == "💳 خرید اشتراک":
-        await buy_subscription(update, context)
+    user_id = query.from_user.id
+    sub_id = query.data.split("_")[1]
 
-    elif text == "🏆 امتیاز های من":
-        await my_points(update, context)
+    sub = get_subscription_by_id(sub_id, user_id)
 
-    elif text == "📚 آموزش ربات":
-        await tutorial(update, context)
+    if not sub:
+        await query.message.reply_text("❌ اشتراک پیدا نشد")
+        return
 
-    elif text == "🛠 پشتیبانی":
-        await support(update, context)
+    config_text = sub[9]
+
+    file_name = f"vpn_{sub_id}.conf"
+
+    with open(file_name, "w") as f:
+        f.write(config_text)
+
+    await query.message.reply_document(document=open(file_name, "rb"))
 
 
-# ===== اجرای ربات =====
-app = ApplicationBuilder().token(TOKEN).build()
+# ---------------- اجرای ربات ----------------
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("config", send_config))
+def main():
 
-app.add_handler(MessageHandler(filters.TEXT, menu_handler))
+    app = ApplicationBuilder().token(TOKEN).build()
 
-app.run_polling()
+    app.add_handler(CommandHandler("start", start))
+
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("📦 اشتراک های من"),
+        my_subscriptions
+    ))
+
+    app.add_handler(CallbackQueryHandler(send_config, pattern="getconfig"))
+
+    print("Bot is running...")
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
