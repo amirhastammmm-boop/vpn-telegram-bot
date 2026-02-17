@@ -5,3 +5,4 @@ flask
 gunicorn
 schedule
 pytz
+python-telegram-bot==20.7
