@@ -1,2 +1,1 @@
-def check_payment(user_id):
-    return True
+PAYMENT_LINK = "https://example.com/pay"
