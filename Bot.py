@@ -3,7 +3,7 @@ import random
 import string
 from datetime import datetime, timedelta
 
-from config import TOKEN, BOT_USERNAME
+from config import TOKEN, BOT_USERNAME, PAYMENT_LINKS
 
 from telegram import (
     Update,
@@ -11,6 +11,7 @@ from telegram import (
     InlineKeyboardMarkup,
     ReplyKeyboardMarkup
 )
+
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -20,7 +21,8 @@ from telegram.ext import (
     filters
 )
 
-# ===== دیتابیس =====
+# ================= DATABASE =================
+
 conn = sqlite3.connect("database.db", check_same_thread=False)
 cursor = conn.cursor()
 
@@ -51,25 +53,27 @@ CREATE TABLE IF NOT EXISTS referrals(
 
 conn.commit()
 
-# ===== ساخت کانفیگ فیک =====
-def generate_config():
-    return "vpn://" + ''.join(random.choices(string.ascii_letters + string.digits, k=25))
+# ================= CONFIG GENERATOR =================
 
-# ===== ساخت اشتراک =====
+def generate_config():
+    return "vpn://" + ''.join(random.choices(string.ascii_letters + string.digits, k=30))
+
+# ================= CREATE SUB =================
+
 def create_subscription(user_id, volume, days):
     expire = datetime.now() + timedelta(days=days)
 
     cursor.execute(
-        "INSERT INTO subscriptions (user_id, volume, expire) VALUES (?,?,?)",
+        "INSERT INTO subscriptions VALUES(NULL,?,?,?)",
         (user_id, volume, expire.strftime("%Y-%m-%d"))
     )
     conn.commit()
 
     return generate_config()
 
-# ===== امتیاز خرید زیرمجموعه =====
-def reward_inviter(user_id, month):
+# ================= REFERRAL REWARD =================
 
+def reward_inviter(user_id, month):
     cursor.execute("SELECT inviter FROM users WHERE user_id=?", (user_id,))
     res = cursor.fetchone()
 
@@ -94,7 +98,8 @@ def reward_inviter(user_id, month):
 
         conn.commit()
 
-# ===== کیبورد اصلی =====
+# ================= MAIN KEYBOARD =================
+
 def main_menu():
     keyboard = [
         ["📦 اشتراک های من"],
@@ -102,9 +107,9 @@ def main_menu():
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-# ===== start =====
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ================= START =================
 
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     if not cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,)).fetchone():
@@ -112,89 +117,69 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         inviter = None
 
         if context.args:
-            try:
-                ref = int(context.args[0])
-                if ref != user_id:
-                    inviter = ref
-            except:
-                pass
+            ref = int(context.args[0])
+            if ref != user_id:
+                inviter = ref
 
-        cursor.execute(
-            "INSERT INTO users (user_id, inviter) VALUES (?,?)",
-            (user_id, inviter)
-        )
+        cursor.execute("INSERT INTO users VALUES(?,?,?)", (user_id, 0, inviter))
 
         if inviter:
             cursor.execute(
-                "INSERT OR IGNORE INTO referrals (inviter, invited) VALUES (?,?)",
+                "INSERT OR IGNORE INTO referrals VALUES(?,?,0)",
                 (inviter, user_id)
-            )
-
-            cursor.execute(
-                "UPDATE users SET points = points + 1 WHERE user_id=?",
-                (inviter,)
             )
 
         conn.commit()
 
-    await update.message.reply_text(
-        "خوش اومدی 👋",
-        reply_markup=main_menu()
-    )
+    await update.message.reply_text("خوش اومدی 👋", reply_markup=main_menu())
 
-# ===== اشتراک های من =====
+# ================= SHOW SUBS =================
+
 async def my_subs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
 
-    cursor.execute(
-        "SELECT volume, expire FROM subscriptions WHERE user_id=?",
-        (user_id,)
-    )
-
+    cursor.execute("SELECT volume, expire FROM subscriptions WHERE user_id=?", (user_id,))
     subs = cursor.fetchall()
 
+    text = "📦 اشتراک های شما:\n\n"
+
     if subs:
-        text = ""
         for s in subs:
-            text += f"📦 {s[0]} گیگ\n⏳ تا {s[1]}\n\n"
+            expire = datetime.strptime(s[1], "%Y-%m-%d")
+            left = (expire - datetime.now()).days
+            text += f"🔹 {s[0]} گیگ | {left} روز باقی مانده\n"
     else:
-        text = "❌ اشتراکی نداری"
+        text += "❌ اشتراکی نداری\n"
 
     keyboard = [
-        [
-            InlineKeyboardButton("1 ماهه", callback_data="sub1"),
-            InlineKeyboardButton("2 ماهه", callback_data="sub2"),
-            InlineKeyboardButton("3 ماهه", callback_data="sub3")
-        ],
+        [InlineKeyboardButton("1 ماهه 33GB - 135T", callback_data="sub1")],
+        [InlineKeyboardButton("2 ماهه 71GB - 270T", callback_data="sub2")],
+        [InlineKeyboardButton("3 ماهه 110GB - 540T", callback_data="sub3")],
         [InlineKeyboardButton("خرید با امتیاز", callback_data="point_buy")]
     ]
 
-    await update.message.reply_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
-# ===== امتیاز =====
+# ================= POINTS =================
+
 async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
 
     cursor.execute("SELECT points FROM users WHERE user_id=?", (user_id,))
-    res = cursor.fetchone()
-
-    p = res[0] if res else 0
+    p = cursor.fetchone()[0]
 
     ref_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
 
     text = f"""
 ⭐ امتیاز شما: {p}
 
-👥 لینک دعوت شما:
+🔗 لینک دعوت:
 {ref_link}
 
-قوانین:
-هر دعوت = 1 امتیاز
+📌 قوانین:
+هر 5 دعوت = 1 امتیاز
 خرید زیرمجموعه:
 1 ماهه = 1 امتیاز
 2 ماهه = 2 امتیاز
@@ -203,7 +188,8 @@ async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
-# ===== دکمه ها =====
+# ================= BUTTON HANDLER =================
+
 async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
@@ -211,43 +197,33 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = query.from_user.id
 
-    if query.data == "sub1":
-        config = create_subscription(user_id, 33, 30)
-        reward_inviter(user_id, 1)
-        await query.message.reply_text(f"کانفیگ شما:\n{config}")
+    if query.data in ["sub1","sub2","sub3"]:
+        link = PAYMENT_LINKS[query.data]
 
-    elif query.data == "sub2":
-        config = create_subscription(user_id, 71, 60)
-        reward_inviter(user_id, 2)
-        await query.message.reply_text(f"کانفیگ شما:\n{config}")
-
-    elif query.data == "sub3":
-        config = create_subscription(user_id, 110, 90)
-        reward_inviter(user_id, 3)
-        await query.message.reply_text(f"کانفیگ شما:\n{config}")
+        await query.message.reply_text(f"لینک پرداخت:\n{link}")
 
     elif query.data == "point_buy":
 
         cursor.execute("SELECT points FROM users WHERE user_id=?", (user_id,))
-        res = cursor.fetchone()
-        p = res[0] if res else 0
+        p = cursor.fetchone()[0]
 
         if p >= 10:
-            config = create_subscription(user_id, 71, 60)
+            config = create_subscription(user_id,71,60)
             cursor.execute("UPDATE users SET points = points - 10 WHERE user_id=?", (user_id,))
             conn.commit()
-            await query.message.reply_text(config)
+            await query.message.reply_text(f"✅ اشتراک فعال شد\n{config}")
 
         elif p >= 5:
-            config = create_subscription(user_id, 33, 30)
+            config = create_subscription(user_id,33,30)
             cursor.execute("UPDATE users SET points = points - 5 WHERE user_id=?", (user_id,))
             conn.commit()
-            await query.message.reply_text(config)
+            await query.message.reply_text(f"✅ اشتراک فعال شد\n{config}")
 
         else:
             await query.message.reply_text("❌ امتیاز کافی نیست")
 
-# ===== هندل پیام =====
+# ================= MESSAGE HANDLER =================
+
 async def handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text
@@ -258,12 +234,14 @@ async def handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "⭐ امتیاز من":
         await points(update, context)
 
-# ===== اجرا =====
-app = ApplicationBuilder().token(TOKEN).build()
+# ================= RUN =================
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handler))
-app.add_handler(CallbackQueryHandler(buttons))
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(TOKEN).build()
 
-print("Bot is running...")
-app.run_polling()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handler))
+    app.add_handler(CallbackQueryHandler(buttons))
+
+    print("Bot Running...")
+    app.run_polling()
