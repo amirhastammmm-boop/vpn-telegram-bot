@@ -4,7 +4,6 @@ BOT_USERNAME = "PayydarVpn_robot"
 
 ADMIN_ID = 633464148
 
-
 PAYMENT_LINKS = {
     "sub1": "https://example.com/pay1",
     "sub2": "https://example.com/pay2",
