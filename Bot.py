@@ -1,119 +1,129 @@
-from aiogram import types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from loader import dp
-from payments import create_payment_link
+from telegram import *
+from telegram.ext import *
+import config
+import database
+import payments
 
 
-# -----------------------
-# منو خرید اشتراک
-# -----------------------
-@dp.message_handler(text="🛒 خرید اشتراک")
-async def buy_menu(message: types.Message):
+app = Application.builder().token(config.BOT_TOKEN).build()
 
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add(
-        InlineKeyboardButton("ادامه خرید", callback_data="continue_buy")
+
+# شروع ربات
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user = update.effective_user
+    args = context.args
+
+    inviter = None
+    if args:
+        inviter = int(args[0])
+
+    database.add_user(user.id, inviter)
+
+    keyboard = ReplyKeyboardMarkup([
+        ["🛒 خرید اشتراک"],
+        ["🏆 امتیاز های من"]
+    ], resize_keyboard=True)
+
+    await update.message.reply_text("به ربات خوش اومدی", reply_markup=keyboard)
+
+
+# ================= خرید اشتراک =================
+
+async def buy_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    keyboard = [[InlineKeyboardButton("ادامه خرید", callback_data="continue_buy")]]
+
+    await update.message.reply_text(
+        "منو خرید اشتراک:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-    text = """
-🛒 منو خرید اشتراک:
 
-⚠️ توجه داشته باشید هر باری که خرید میکنید یک اشتراک جدید با فایل های جدید دریافت میکنید و اشتراک هایی که قبلا تمام شده اند تمدید نمیشوند و باید از فایل های اشتراک جدید استفاده کنید
+async def continue_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-✅ برای ادامه دکمه زیر را فشار دهید
+    q = update.callback_query
+    await q.answer()
+
+    keyboard = [[InlineKeyboardButton("خرید با درگاه پرداخت مستقیم", callback_data="direct_pay")]]
+
+    await q.edit_message_text(
+        "⚠️ توجه داشته باشید هر باری که خرید میکنید یک اشتراک جدید دریافت میکنید\n\n"
+        "✅برای ادامه دکمه زیر را فشار دهید",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def direct_pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    q = update.callback_query
+    await q.answer()
+
+    keyboard = [
+        [InlineKeyboardButton("یک ماهه ۱۲۸ هزار", callback_data="pay_1")],
+        [InlineKeyboardButton("دو ماهه ۱۹۸ هزار", callback_data="pay_2")],
+        [InlineKeyboardButton("سه ماهه ۳۲۹ هزار", callback_data="pay_3")]
+    ]
+
+    await q.edit_message_text(
+        "👈 لطفا یک گزینه را انتخاب کنید",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def create_pay(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    q = update.callback_query
+    await q.answer()
+
+    prices = {
+        "pay_1": 128000,
+        "pay_2": 198000,
+        "pay_3": 329000
+    }
+
+    amount = prices[q.data]
+
+    link = payments.create_payment(amount)
+
+    await q.message.reply_text(f"لینک پرداخت:\n{link}")
+
+
+# ================= امتیاز =================
+
+async def points_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user = update.effective_user.id
+
+    points = database.get_points(user)
+    ref_count = database.get_ref_count(user)
+
+    link = f"https://t.me/{config.BOT_USERNAME}?start={user}"
+
+    text = f"""
+🏆 با معرفی ربات امتیاز بگیر
+
+🎖 امتیاز شما: {points}
+🙍‍♂️ زیرمجموعه شما: {ref_count}
+
+🌍 لینک اختصاصی شما:
+{link}
 """
 
-    await message.answer(text, reply_markup=keyboard)
+    await update.message.reply_text(text)
 
 
-# -----------------------
-# ادامه خرید
-# -----------------------
-@dp.callback_query_handler(lambda c: c.data == "continue_buy")
-async def continue_buy(callback: types.CallbackQuery):
+# ================= هندلر ها =================
 
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add(
-        InlineKeyboardButton(
-            "💳 خرید با درگاه پرداخت مستقیم",
-            callback_data="direct_payment"
-        )
-    )
+app.add_handler(CommandHandler("start", start))
 
-    await callback.message.edit_text(
-        "👈 لطفا یک گزینه را انتخاب کنید",
-        reply_markup=keyboard
-    )
+app.add_handler(MessageHandler(filters.TEXT == "🛒 خرید اشتراک", buy_menu))
+app.add_handler(MessageHandler(filters.TEXT == "🏆 امتیاز های من", points_menu))
+
+app.add_handler(CallbackQueryHandler(continue_buy, pattern="continue_buy"))
+app.add_handler(CallbackQueryHandler(direct_pay, pattern="direct_pay"))
+app.add_handler(CallbackQueryHandler(create_pay, pattern="pay_"))
 
 
-# -----------------------
-# انتخاب درگاه مستقیم
-# -----------------------
-@dp.callback_query_handler(lambda c: c.data == "direct_payment")
-async def direct_payment(callback: types.CallbackQuery):
-
-    keyboard = InlineKeyboardMarkup(row_width=1)
-
-    keyboard.add(
-        InlineKeyboardButton(
-            "یک کاربره یک ماهه 36 گیگابایت - 128 هزار تومان",
-            callback_data="plan_1"
-        )
-    )
-
-    keyboard.add(
-        InlineKeyboardButton(
-            "یک کاربره دو ماهه 78 گیگابایت - 198 هزار تومان",
-            callback_data="plan_2"
-        )
-    )
-
-    keyboard.add(
-        InlineKeyboardButton(
-            "یک کاربره سه ماهه 127 گیگابایت - 329 هزار تومان",
-            callback_data="plan_3"
-        )
-    )
-
-    await callback.message.edit_text(
-        "📦 لطفا پلن مورد نظر را انتخاب کنید",
-        reply_markup=keyboard
-    )
-
-
-# -----------------------
-# انتخاب پلن ها
-# -----------------------
-@dp.callback_query_handler(lambda c: c.data.startswith("plan_"))
-async def select_plan(callback: types.CallbackQuery):
-
-    user_id = callback.from_user.id
-    plan = callback.data
-
-    if plan == "plan_1":
-        price = 128000
-        title = "اشتراک یک ماهه"
-
-    elif plan == "plan_2":
-        price = 198000
-        title = "اشتراک دو ماهه"
-
-    elif plan == "plan_3":
-        price = 329000
-        title = "اشتراک سه ماهه"
-
-    # ساخت لینک پرداخت
-    payment_url = await create_payment_link(user_id, price, title)
-
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add(
-        InlineKeyboardButton(
-            "پرداخت",
-            url=payment_url
-        )
-    )
-
-    await callback.message.edit_text(
-        f"✅ برای پرداخت روی دکمه زیر بزنید\n\n💰 مبلغ: {price} تومان",
-        reply_markup=keyboard
-    )
+print("Bot Running...")
+app.run_polling()
