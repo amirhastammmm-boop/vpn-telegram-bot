@@ -14,42 +14,35 @@ CREATE TABLE IF NOT EXISTS users(
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS referrals(
     inviter INTEGER,
-    invited INTEGER UNIQUE
+    invited INTEGER
 )
 """)
 
 conn.commit()
 
 
-# اضافه کردن کاربر
 def add_user(user_id, inviter=None):
+    cursor.execute("SELECT user_id FROM users WHERE user_id=?", (user_id,))
+    if cursor.fetchone() is None:
+        cursor.execute("INSERT INTO users (user_id, inviter) VALUES (?,?)", (user_id, inviter))
+        conn.commit()
 
-    cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
-    if cursor.fetchone():
-        return
+        if inviter:
+            cursor.execute("INSERT INTO referrals VALUES (?,?)", (inviter, user_id))
+            conn.commit()
 
-    cursor.execute(
-        "INSERT INTO users (user_id, inviter) VALUES (?,?)",
-        (user_id, inviter)
-    )
 
-    if inviter:
-        cursor.execute(
-            "INSERT OR IGNORE INTO referrals VALUES (?,?)",
-            (inviter, user_id)
-        )
+def get_points(user_id):
+    cursor.execute("SELECT points FROM users WHERE user_id=?", (user_id,))
+    result = cursor.fetchone()
+    return result[0] if result else 0
 
+
+def add_points(user_id, amount):
+    cursor.execute("UPDATE users SET points = points + ? WHERE user_id=?", (amount, user_id))
     conn.commit()
 
 
-# گرفتن امتیاز
-def get_points(user_id):
-    cursor.execute("SELECT points FROM users WHERE user_id=?", (user_id,))
-    data = cursor.fetchone()
-    return data[0] if data else 0
-
-
-# تعداد زیرمجموعه
 def get_ref_count(user_id):
     cursor.execute("SELECT COUNT(*) FROM referrals WHERE inviter=?", (user_id,))
     return cursor.fetchone()[0]
