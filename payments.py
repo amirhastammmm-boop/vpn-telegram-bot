@@ -1,26 +1,20 @@
-import aiohttp
+import requests
 from config import NEXT_PAY_API_KEY, CALLBACK_URL
 
 
-async def create_payment_link(user_id, amount, title):
-
+def create_payment(amount):
     url = "https://nextpay.org/nx/gateway/token"
 
-    payload = {
+    data = {
         "api_key": NEXT_PAY_API_KEY,
         "amount": amount,
-        "callback_uri": CALLBACK_URL,
-        "order_id": str(user_id),
-        "description": title
+        "callback_uri": CALLBACK_URL
     }
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=payload) as resp:
+    r = requests.post(url, json=data).json()
 
-            data = await resp.json()
+    if r["code"] == 200:
+        token = r["trans_id"]
+        return f"https://nextpay.org/nx/gateway/payment/{token}"
 
-            if data["code"] == -1:
-                token = data["trans_id"]
-                return f"https://nextpay.org/nx/gateway/payment/{token}"
-
-            return "خطا در ساخت لینک پرداخت"
+    return None
