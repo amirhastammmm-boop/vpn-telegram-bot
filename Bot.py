@@ -1,258 +1,277 @@
-from telegram import *
-from telegram.ext import *
-import config
 import sqlite3
-import datetime
+import random
+import string
+from datetime import datetime, timedelta
+
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup
+)
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters
+)
+
+# ===== تنظیمات =====
+TOKEN = "PUT_YOUR_TOKEN_HERE"
+BOT_USERNAME = "PayydarVpn_robot"
 
 # ===== دیتابیس =====
-db = sqlite3.connect("bot.db", check_same_thread=False)
-cursor = db.cursor()
+conn = sqlite3.connect("database.db", check_same_thread=False)
+cursor = conn.cursor()
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS users(
     user_id INTEGER PRIMARY KEY,
-    score INTEGER DEFAULT 0,
-    referrer INTEGER,
-    invited INTEGER DEFAULT 0
+    points INTEGER DEFAULT 0,
+    inviter INTEGER
 )
 """)
 
 cursor.execute("""
-CREATE TABLE IF NOT EXISTS subs(
+CREATE TABLE IF NOT EXISTS subscriptions(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
-    plan INTEGER,
-    expire TEXT,
-    volume INTEGER
+    volume INTEGER,
+    expire TEXT
 )
 """)
 
-db.commit()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS referrals(
+    inviter INTEGER,
+    invited INTEGER UNIQUE,
+    purchased INTEGER DEFAULT 0
+)
+""")
+
+conn.commit()
 
 
-# ===== کیبورد =====
-def main_keyboard():
+# ===== ساخت کانفیگ فیک =====
+def generate_config():
+    return "vpn://" + ''.join(random.choices(string.ascii_letters + string.digits, k=25))
+
+
+# ===== ساخت اشتراک =====
+def create_subscription(user_id, volume, days):
+    expire = datetime.now() + timedelta(days=days)
+
+    cursor.execute(
+        "INSERT INTO subscriptions (user_id, volume, expire) VALUES (?,?,?)",
+        (user_id, volume, expire.strftime("%Y-%m-%d"))
+    )
+    conn.commit()
+
+    return generate_config()
+
+
+# ===== امتیاز خرید زیرمجموعه =====
+def reward_inviter(user_id, month):
+    cursor.execute("SELECT inviter FROM users WHERE user_id=?", (user_id,))
+    res = cursor.fetchone()
+
+    if not res or not res[0]:
+        return
+
+    inviter = res[0]
+
+    cursor.execute(
+        "SELECT purchased FROM referrals WHERE invited=?",
+        (user_id,)
+    )
+    data = cursor.fetchone()
+
+    if data and data[0] == 0:
+        cursor.execute(
+            "UPDATE users SET points = points + ? WHERE user_id=?",
+            (month, inviter)
+        )
+
+        cursor.execute(
+            "UPDATE referrals SET purchased=1 WHERE invited=?",
+            (user_id,)
+        )
+
+        conn.commit()
+
+
+# ===== کیبورد اصلی =====
+def main_menu():
     keyboard = [
         ["📦 اشتراک های من"],
-        ["⭐ امتیاز من"],
-        ["🎁 خرید با امتیاز"]
+        ["⭐ امتیاز من"]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
-# ===== گرفتن امتیاز امن =====
-def get_score(user_id):
-    cursor.execute("SELECT score FROM users WHERE user_id=?", (user_id,))
-    data = cursor.fetchone()
-    return data[0] if data else 0
-
-
-# ===== ثبت کاربر + ضد تقلب =====
-def add_user(user_id, referrer=None):
-
-    cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
-    if cursor.fetchone():
-        return
-
-    if referrer == user_id:
-        referrer = None
-
-    cursor.execute(
-        "INSERT INTO users (user_id, referrer) VALUES (?,?)",
-        (user_id, referrer)
-    )
-
-    # امتیاز دعوت
-    if referrer:
-
-        cursor.execute("SELECT invited FROM users WHERE user_id=?", (user_id,))
-        invited = cursor.fetchone()
-
-        if invited is None or invited[0] == 0:
-
-            cursor.execute(
-                "UPDATE users SET score = score + 1 WHERE user_id=?",
-                (referrer,)
-            )
-
-            cursor.execute(
-                "UPDATE users SET invited = 1 WHERE user_id=?",
-                (user_id,)
-            )
-
-    db.commit()
-
-
-# ===== امتیاز خرید زیرمجموعه =====
-def add_purchase_score(user_id, plan):
-
-    cursor.execute("SELECT referrer FROM users WHERE user_id=?", (user_id,))
-    ref = cursor.fetchone()
-
-    if not ref or not ref[0]:
-        return
-
-    score = plan
-    cursor.execute(
-        "UPDATE users SET score = score + ? WHERE user_id=?",
-        (score, ref[0])
-    )
-
-    db.commit()
-
-
-# ===== ساخت اشتراک =====
-def create_sub(user_id, plan):
-
-    if plan == 1:
-        days = 30
-        volume = 33
-    elif plan == 2:
-        days = 60
-        volume = 71
-    else:
-        days = 90
-        volume = 110
-
-    expire = datetime.datetime.now() + datetime.timedelta(days=days)
-
-    cursor.execute(
-        "INSERT INTO subs VALUES (?,?,?,?)",
-        (user_id, plan, expire.strftime("%Y-%m-%d"), volume)
-    )
-
-    db.commit()
-    add_purchase_score(user_id, plan)
-
-
-# ===== استارت =====
+# ===== start =====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     user_id = update.effective_user.id
-    ref = None
 
-    if context.args:
-        try:
+    if not cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,)).fetchone():
+
+        inviter = None
+
+        if context.args:
             ref = int(context.args[0])
-        except:
-            pass
 
-    add_user(user_id, ref)
+            if ref != user_id:
+                inviter = ref
+
+        cursor.execute(
+            "INSERT INTO users (user_id, inviter) VALUES (?,?)",
+            (user_id, inviter)
+        )
+
+        if inviter:
+            cursor.execute(
+                "INSERT OR IGNORE INTO referrals (inviter, invited) VALUES (?,?)",
+                (inviter, user_id)
+            )
+
+            cursor.execute(
+                "UPDATE users SET points = points + 1 WHERE user_id=?",
+                (inviter,)
+            )
+
+        conn.commit()
 
     await update.message.reply_text(
-        "👋 خوش اومدی",
-        reply_markup=main_keyboard()
+        "خوش اومدی 👋",
+        reply_markup=main_menu()
     )
 
 
-# ===== نمایش اشتراک =====
-async def show_sub(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
+# ===== اشتراک های من =====
+async def my_subs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    cursor.execute("SELECT * FROM subs WHERE user_id=?", (user_id,))
-    data = cursor.fetchall()
+    cursor.execute(
+        "SELECT volume, expire FROM subscriptions WHERE user_id=?",
+        (user_id,)
+    )
 
-    if not data:
-        await update.message.reply_text("❌ اشتراکی نداری")
-        return
+    subs = cursor.fetchall()
 
-    text = "📦 اشتراک های شما:\n\n"
+    text = ""
 
-    for sub in data:
-        expire = datetime.datetime.strptime(sub[2], "%Y-%m-%d")
-        remain = expire - datetime.datetime.now()
+    if subs:
+        for s in subs:
+            text += f"📦 {s[0]} گیگ\n⏳ تا {s[1]}\n\n"
+    else:
+        text = "❌ اشتراکی نداری"
 
-        text += f"""
-پلن {sub[1]} ماهه
-حجم {sub[3]} گیگ
-باقی مانده {remain.days} روز
-"""
+    keyboard = [
+        [
+            InlineKeyboardButton("1 ماهه", callback_data="sub1"),
+            InlineKeyboardButton("2 ماهه", callback_data="sub2"),
+            InlineKeyboardButton("3 ماهه", callback_data="sub3")
+        ],
+        [InlineKeyboardButton("خرید با امتیاز", callback_data="point_buy")]
+    ]
 
-    await update.message.reply_text(text)
+    await update.message.reply_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 
-# ===== نمایش امتیاز =====
-async def score(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
+# ===== امتیاز =====
+async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    sc = get_score(user_id)
 
-    referral = f"https://t.me/{config.BOT_USERNAME}?start={user_id}"
+    cursor.execute("SELECT points FROM users WHERE user_id=?", (user_id,))
+    p = cursor.fetchone()[0]
+
+    ref_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
 
     text = f"""
-⭐ امتیاز شما: {sc}
+⭐ امتیاز شما: {p}
 
 👥 لینک دعوت شما:
-{referral}
+{ref_link}
 
-هر دعوت = ۱ امتیاز
-۱ ماه = ۵ امتیاز
-۲ ماه = ۱۰ امتیاز
+قوانین:
+هر دعوت = 1 امتیاز
+خرید زیرمجموعه:
+1 ماهه = 1 امتیاز
+2 ماهه = 2 امتیاز
+3 ماهه = 3 امتیاز
 """
 
     await update.message.reply_text(text)
 
 
-# ===== خرید با امتیاز =====
-async def buy_with_score(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ===== دکمه ها =====
+async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
-    user_id = update.effective_user.id
-    sc = get_score(user_id)
+    user_id = query.from_user.id
 
-    if sc >= 10:
+    if query.data == "sub1":
+        await query.message.reply_text("در حال انتقال به پرداخت...")
+        config = create_subscription(user_id, 33, 30)
+        reward_inviter(user_id, 1)
+        await query.message.reply_text(f"کانفیگ شما:\n{config}")
 
-        create_sub(user_id, 2)
+    elif query.data == "sub2":
+        await query.message.reply_text("در حال انتقال به پرداخت...")
+        config = create_subscription(user_id, 71, 60)
+        reward_inviter(user_id, 2)
+        await query.message.reply_text(f"کانفیگ شما:\n{config}")
 
-        cursor.execute(
-            "UPDATE users SET score = score - 10 WHERE user_id=?",
-            (user_id,)
-        )
-        db.commit()
+    elif query.data == "sub3":
+        await query.message.reply_text("در حال انتقال به پرداخت...")
+        config = create_subscription(user_id, 110, 90)
+        reward_inviter(user_id, 3)
+        await query.message.reply_text(f"کانفیگ شما:\n{config}")
 
-        await update.message.reply_text("✅ اشتراک ۲ ماهه فعال شد")
+    elif query.data == "point_buy":
 
-    elif sc >= 5:
+        cursor.execute("SELECT points FROM users WHERE user_id=?", (user_id,))
+        p = cursor.fetchone()[0]
 
-        create_sub(user_id, 1)
+        if p >= 10:
+            config = create_subscription(user_id, 71, 60)
+            cursor.execute("UPDATE users SET points = points - 10 WHERE user_id=?", (user_id,))
+            conn.commit()
+            await query.message.reply_text(config)
 
-        cursor.execute(
-            "UPDATE users SET score = score - 5 WHERE user_id=?",
-            (user_id,)
-        )
-        db.commit()
+        elif p >= 5:
+            config = create_subscription(user_id, 33, 30)
+            cursor.execute("UPDATE users SET points = points - 5 WHERE user_id=?", (user_id,))
+            conn.commit()
+            await query.message.reply_text(config)
 
-        await update.message.reply_text("✅ اشتراک ۱ ماهه فعال شد")
-
-    else:
-        await update.message.reply_text("❌ امتیاز کافی نداری")
+        else:
+            await query.message.reply_text("❌ امتیاز کافی نیست")
 
 
-# ===== مدیریت پیام =====
-async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
+# ===== هندل پیام =====
+async def handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
     if text == "📦 اشتراک های من":
-        await show_sub(update, context)
+        await my_subs(update, context)
 
     elif text == "⭐ امتیاز من":
-        await score(update, context)
-
-    elif text == "🎁 خرید با امتیاز":
-        await buy_with_score(update, context)
+        await points(update, context)
 
 
 # ===== اجرا =====
-def main():
+app = ApplicationBuilder().token(TOKEN).build()
 
-    app = ApplicationBuilder().token(config.TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handler))
+app.add_handler(CallbackQueryHandler(buttons))
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-
-    print("Bot Started...")
-    app.run_polling()
-
-
-if __name__ == "__main__":
-    main()
+print("Bot is running...")
+app.run_polling()
