@@ -1,147 +1,119 @@
-from telegram import (
-    Update,
-    ReplyKeyboardMarkup,
-    KeyboardButton
-)
-
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
-)
-
-from config import TOKEN, BOT_USERNAME
-from database import add_user, get_points, get_ref_count
+from aiogram import types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from loader import dp
+from payments import create_payment_link
 
 
-# -------- منو --------
+# -----------------------
+# منو خرید اشتراک
+# -----------------------
+@dp.message_handler(text="🛒 خرید اشتراک")
+async def buy_menu(message: types.Message):
 
-def main_menu():
-
-    keyboard = [
-        [KeyboardButton("💳 خرید اشتراک"), KeyboardButton("📦 اشتراک های من")],
-        [KeyboardButton("🏆 امتیاز های من"), KeyboardButton("📚 آموزش ربات")],
-        [KeyboardButton("🛠 پشتیبانی")]
-    ]
-
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-
-# -------- start --------
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.effective_user.id
-    inviter = None
-
-    # دریافت لینک رفرال
-    if context.args:
-        try:
-            ref = int(context.args[0])
-
-            if ref != user_id:
-                inviter = ref
-        except:
-            pass
-
-    add_user(user_id, inviter)
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(
+        InlineKeyboardButton("ادامه خرید", callback_data="continue_buy")
+    )
 
     text = """
-♥️سلام دوست عزیز
+🛒 منو خرید اشتراک:
 
-به ربات پینگ خور خوش اومدی
+⚠️ توجه داشته باشید هر باری که خرید میکنید یک اشتراک جدید با فایل های جدید دریافت میکنید و اشتراک هایی که قبلا تمام شده اند تمدید نمیشوند و باید از فایل های اشتراک جدید استفاده کنید
 
-⬇️لطفا یک گزینه رو انتخاب کن
+✅ برای ادامه دکمه زیر را فشار دهید
 """
 
-    await update.message.reply_text(text, reply_markup=main_menu())
+    await message.answer(text, reply_markup=keyboard)
 
 
-# -------- امتیاز ها --------
+# -----------------------
+# ادامه خرید
+# -----------------------
+@dp.callback_query_handler(lambda c: c.data == "continue_buy")
+async def continue_buy(callback: types.CallbackQuery):
 
-async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(
+        InlineKeyboardButton(
+            "💳 خرید با درگاه پرداخت مستقیم",
+            callback_data="direct_payment"
+        )
+    )
 
-    user_id = update.effective_user.id
-
-    points = get_points(user_id)
-    refs = get_ref_count(user_id)
-
-    ref_link = f"https://t.me/{BOT_USERNAME}?start={user_id}"
-
-    text = f"""
-🏆با معرفی کردن پینگ خور به دیگران، کسب امتیاز کنید و اشتراک رایگان دریافت کنید!
-
-
-
-✅لینک اختصاصی خودتون رو از پایین همین پیام کپی کنید و در گروه ها و کانال های مختلف و شبکه های اجتماعی به اشتراک بگذارید و هر فردی که روی لینک شما کلیک کنه وارد ربات میشه و این فرد به عنوان زیر مجموعه شما ذخیره میشه و با هر خریدی که این فرد انجام بده، به شما امتیاز تعلق میگیره و شما میتونید از امتیازات کسب شده به جای پول استفاده کنید و اشتراک بخرید
-
-
-
-✅با خرید اکانت یک ماهه توسط زیر مجموعه های شما، 1 امتیاز  و با خرید اکانت 2 ماهه، 2 امتیاز و با خرید اکانت 3 ماهه 3 امتیاز به شما تعلق میگیره همچنین با خرید هایی که زیر مجموعه های شما در ماه های بعد انجام میدهند باز هم به شما امتیاز تعلق میگیره و همچنین میتونید بی نهایت زیرمجموعه کسب کنید
-
-
-
-⭕️نکته: افرادی که روی لینک شما کلیک میکنن باید قبلا خریدی انجام نداده باشن در غیر اینصورت به عنوان زیر مجموعه شما ذخیره نمیشن
-
-🎖تعداد امتیازهای شما         : {points}
-🙍‍♂️تعداد زیرمجموعه های شما: {refs}
-🌍لینک اخصاصی شما(👇)
-
-{ref_link}
-"""
-
-    await update.message.reply_text(text)
-
-
-# -------- آموزش --------
-
-async def tutorial(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    await update.message.reply_text(
-        "📚 آموزش استفاده از Wireguard بزودی اضافه میشود"
+    await callback.message.edit_text(
+        "👈 لطفا یک گزینه را انتخاب کنید",
+        reply_markup=keyboard
     )
 
 
-# -------- پشتیبانی --------
+# -----------------------
+# انتخاب درگاه مستقیم
+# -----------------------
+@dp.callback_query_handler(lambda c: c.data == "direct_payment")
+async def direct_payment(callback: types.CallbackQuery):
 
-async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = InlineKeyboardMarkup(row_width=1)
 
-    await update.message.reply_text(
-        "جهت پشتیبانی به آیدی زیر پیام دهید:\n@633464148"
+    keyboard.add(
+        InlineKeyboardButton(
+            "یک کاربره یک ماهه 36 گیگابایت - 128 هزار تومان",
+            callback_data="plan_1"
+        )
+    )
+
+    keyboard.add(
+        InlineKeyboardButton(
+            "یک کاربره دو ماهه 78 گیگابایت - 198 هزار تومان",
+            callback_data="plan_2"
+        )
+    )
+
+    keyboard.add(
+        InlineKeyboardButton(
+            "یک کاربره سه ماهه 127 گیگابایت - 329 هزار تومان",
+            callback_data="plan_3"
+        )
+    )
+
+    await callback.message.edit_text(
+        "📦 لطفا پلن مورد نظر را انتخاب کنید",
+        reply_markup=keyboard
     )
 
 
-# -------- هندل پیام --------
+# -----------------------
+# انتخاب پلن ها
+# -----------------------
+@dp.callback_query_handler(lambda c: c.data.startswith("plan_"))
+async def select_plan(callback: types.CallbackQuery):
 
-async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = callback.from_user.id
+    plan = callback.data
 
-    text = update.message.text
+    if plan == "plan_1":
+        price = 128000
+        title = "اشتراک یک ماهه"
 
-    if text == "🏆 امتیاز های من":
-        await points(update, context)
+    elif plan == "plan_2":
+        price = 198000
+        title = "اشتراک دو ماهه"
 
-    elif text == "📚 آموزش ربات":
-        await tutorial(update, context)
+    elif plan == "plan_3":
+        price = 329000
+        title = "اشتراک سه ماهه"
 
-    elif text == "🛠 پشتیبانی":
-        await support(update, context)
+    # ساخت لینک پرداخت
+    payment_url = await create_payment_link(user_id, price, title)
 
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(
+        InlineKeyboardButton(
+            "پرداخت",
+            url=payment_url
+        )
+    )
 
-# -------- اجرا --------
-
-def main():
-
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-
-    print("Bot Started...")
-    app.run_polling()
-
-
-if __name__ == "__main__":
-    main()
+    await callback.message.edit_text(
+        f"✅ برای پرداخت روی دکمه زیر بزنید\n\n💰 مبلغ: {price} تومان",
+        reply_markup=keyboard
+    )
