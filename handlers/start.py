@@ -1,28 +1,24 @@
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from database import add_user
-
+from telebot import types
 
 def register_start_handlers(bot):
 
-    @bot.message_handler(commands=['ref'])
-    def referral_panel(message):
+    @bot.message_handler(commands=['start'])
+    def start(message):
 
-        user_id = message.from_user.id
+        args = message.text.split()
 
-        referral_link = f"https://t.me/{bot.get_me().username}?start={user_id}"
+        if len(args) > 1:
+            code = args[1]
 
-        text = f"""
-🎁 لینک دعوت شما:
+            # ذخیره کد رفرال
+            # save_referral(message.from_user.id, code)
 
-{referral_link}
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add("🛒 خرید اشتراک")
+        markup.add("⭐ امتیازهای من")
 
-📌 با دعوت هر نفر 1 امتیاز میگیری
-"""
-
-        keyboard = InlineKeyboardMarkup()
-
-        keyboard.add(
-            InlineKeyboardButton("📤 اشتراک گذاری لینک", url=f"https://t.me/share/url?url={referral_link}")
+        bot.send_message(
+            message.chat.id,
+            "به ربات فروش کانفیگ خوش اومدی 👋",
+            reply_markup=markup
         )
-
-        bot.send_message(message.chat.id, text, reply_markup=keyboard)
