@@ -5,23 +5,25 @@ from utils import create_wireguard_conf
 
 def register_my_sub_handlers(bot):
 
-    @bot.message_handler(func=lambda m: m.text == "📦 اشتراک های من")
+    # ---------------- اشتراک های من ----------------
+
+    @bot.message_handler(func=lambda m: m.text == "اشتراک های من")
     def my_subscriptions(message):
 
         subs = get_user_subscriptions(message.from_user.id)
 
         if not subs:
-            bot.send_message(message.chat.id, "❌ شما هیچ اشتراکی ندارید")
+            bot.send_message(message.chat.id, "❌ شما اشتراکی ندارید")
             return
 
         for sub in subs:
 
             text = f"""
-🎗 شماره اشتراک: {sub[0]}
+🔑 شماره اشتراک : {sub[0]}
 
-📅 تاریخ خرید: {sub[2]}
-⏳ تاریخ اتمام: {sub[3]}
-📊 حجم باقی مانده: {sub[4]}
+📅 تاریخ خرید : {sub[2]}
+⏳ تاریخ اتمام : {sub[3]}
+📊 حجم باقی مانده : {sub[4]}
 """
 
             markup = types.InlineKeyboardMarkup()
@@ -33,16 +35,23 @@ def register_my_sub_handlers(bot):
                 )
             )
 
-            bot.send_message(message.chat.id, text, reply_markup=markup)
+            bot.send_message(
+                message.chat.id,
+                text,
+                reply_markup=markup
+            )
+
+    # ---------------- ارسال فایل کانفیگ ----------------
 
     @bot.callback_query_handler(func=lambda call: call.data.startswith("getfile_"))
     def send_config(call):
 
-        sub_id = call.data.split("_")[1]
+        sub_id = int(call.data.split("_")[1])
 
         sub = get_subscription(call.from_user.id, sub_id)
 
         if not sub:
+            bot.answer_callback_query(call.id, "خطا")
             return
 
         file_path = create_wireguard_conf(call.from_user.id, sub)
