@@ -1,33 +1,24 @@
-from telebot import types
-from database import create_subscription, add_points, get_user
+from telegram import Update
+from telegram.ext import ContextTypes, MessageHandler, filters
+from keyboards import buy_menu, main_menu
 
-def register_buy_handlers(bot):
+async def buy_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "پلن مورد نظر رو انتخاب کن:",
+        reply_markup=buy_menu()
+    )
 
-    @bot.message_handler(func=lambda m: m.text == "💳 خرید اشتراک")
-    def buy(message):
-        markup = types.InlineKeyboardMarkup()
-        markup.add(
-            types.InlineKeyboardButton("1 ماهه", callback_data="buy_1"),
-            types.InlineKeyboardButton("2 ماهه", callback_data="buy_2"),
-            types.InlineKeyboardButton("3 ماهه", callback_data="buy_3"),
-        )
-        bot.send_message(message.chat.id, "پلن رو انتخاب کن:", reply_markup=markup)
+async def buy_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    plan = update.message.text
 
-    @bot.callback_query_handler(func=lambda c: c.data.startswith("buy_"))
-    def process_buy(call):
-        months = int(call.data.split("_")[1])
-        user_id = call.from_user.id
+    if plan == "🔙 بازگشت":
+        await update.message.reply_text("برگشتی به منو اصلی", reply_markup=main_menu())
+        return
 
-        create_subscription(user_id, months)
+    await update.message.reply_text(
+        f"شما پلن {plan} رو انتخاب کردی.\nبعداً اینجا پرداخت وصل میشه."
+    )
 
-        user = get_user(user_id)
-        invited_by = user[1]
-
-        if invited_by:
-            add_points(invited_by, months)
-
-        bot.answer_callback_query(call.id)
-        bot.send_message(
-            call.message.chat.id,
-            f"✅ خرید {months} ماهه با موفقیت انجام شد!"
-        )
+def register_buy_handlers(app):
+    app.add_handler(MessageHandler(filters.Regex("🛒 خرید اشتراک"), buy_handler))
+    app.add_handler(MessageHandler(filters.Regex("1 ماهه|2 ماهه|3 ماهه|🔙 بازگشت"), buy_plan))
