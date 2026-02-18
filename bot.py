@@ -79,7 +79,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.commit()
 
     await update.message.reply_text(
-        "به ربات فروش اشتراک خوش اومدی 👋", reply_markup=main_menu()
+        "به ربات Payydar VPN خوش اومدی 👋",
+        reply_markup=main_menu()
     )
 
 
@@ -92,7 +93,8 @@ async def buy_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("۳ ماهه", callback_data="buy_3")],
     ]
     await update.message.reply_text(
-        "پلن مورد نظر رو انتخاب کن:", reply_markup=InlineKeyboardMarkup(keyboard)
+        "پلن مورد نظر رو انتخاب کن:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
@@ -113,19 +115,22 @@ async def handle_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
 
     await query.edit_message_text(
-        f"✅ اشتراک ساخته شد\n\nکد:\n{sub_code}\nانقضا: {expire.strftime('%Y-%m-%d')}"
+        f"✅ اشتراک ساخته شد\n\n"
+        f"کد اشتراک:\n{sub_code}\n\n"
+        f"تاریخ انقضا: {expire.strftime('%Y-%m-%d')}"
     )
 
 
 async def my_subs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     cursor.execute(
-        "SELECT sub_code, expire_date FROM subscriptions WHERE user_id=?", (user_id,)
+        "SELECT sub_code, expire_date FROM subscriptions WHERE user_id=?",
+        (user_id,),
     )
     subs = cursor.fetchall()
 
     if not subs:
-        await update.message.reply_text("❌ اشتراکی نداری.")
+        await update.message.reply_text("❌ شما اشتراکی ندارید.")
         return
 
     text = "📦 اشتراک های شما:\n\n"
@@ -138,7 +143,8 @@ async def my_subs(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def points_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     cursor.execute(
-        "SELECT referral_code, points FROM users WHERE user_id=?", (user_id,)
+        "SELECT referral_code, points FROM users WHERE user_id=?",
+        (user_id,),
     )
     data = cursor.fetchone()
 
@@ -148,15 +154,21 @@ async def points_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = f"""
 🎁 امتیاز شما: {points}
 
-کد رفرال:
+کد رفرال شما:
 {referral_code}
+
+لینک دعوت شما:
+https://t.me/PayydarVpn_robot?start={referral_code}
+
+هر ۵ امتیاز = اشتراک رایگان
+هر ۸ امتیاز = اشتراک ویژه
 """
 
     await update.message.reply_text(text)
 
 
 async def send_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("📚 آموزش به زودی اضافه میشه.")
+    await update.message.reply_text("📚 آموزش اتصال بعد از خرید ارسال می‌شود.")
 
 
 async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
