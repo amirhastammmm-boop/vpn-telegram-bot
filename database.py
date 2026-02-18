@@ -1,146 +1,103 @@
 import sqlite3
+import random
+import string
 from datetime import datetime, timedelta
 
-
 def connect():
-    return sqlite3.connect("data.db")
-
+    return sqlite3.connect("bot.db", check_same_thread=False)
 
 def create_tables():
     conn = connect()
     cur = conn.cursor()
 
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS users(
+    CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
+        referral_code TEXT UNIQUE,
+        invited_by INTEGER,
         points INTEGER DEFAULT 0
     )
     """)
 
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS subscriptions(
+    CREATE TABLE IF NOT EXISTS subscriptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
         months INTEGER,
         start TEXT,
-        end TEXT
+        end TEXT,
+        config TEXT
     )
     """)
 
     conn.commit()
     conn.close()
 
+def generate_referral():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
-def add_user(user_id):
+def add_user(user_id, ref_code=None):
     conn = connect()
     cur = conn.cursor()
 
+    cur.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
+    if cur.fetchone():
+        conn.close()
+        return
+
+    my_code = generate_referral()
+
+    invited_by = None
+    if ref_code:
+        cur.execute("SELECT user_id FROM users WHERE referral_code=?", (ref_code,))
+        row = cur.fetchone()
+        if row and row[0] != user_id:
+            invited_by = row[0]
+
     cur.execute(
-        "INSERT OR IGNORE INTO users(user_id) VALUES(?)",
-        (user_id,)
+        "INSERT INTO users (user_id, referral_code, invited_by) VALUES (?, ?, ?)",
+        (user_id, my_code, invited_by)
     )
 
     conn.commit()
     conn.close()
 
+def get_user(user_id):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
+    user = cur.fetchone()
+    conn.close()
+    return user
+
+def add_points(user_id, amount):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET points = points + ? WHERE user_id=?", (amount, user_id))
+    conn.commit()
+    conn.close()
 
 def create_subscription(user_id, months):
-
-    add_user(user_id)
+    conn = connect()
+    cur = conn.cursor()
 
     start = datetime.now()
-    end = start + timedelta(days=30 * months)
+    end = start + timedelta(days=30*months)
 
-    conn = connect()
-    cur = conn.cursor()
+    config = f"FAKE_WG_CONFIG_FOR_{user_id}"
 
     cur.execute("""
-        INSERT INTO subscriptions(user_id, months, start, end)
-        VALUES(?,?,?,?)
-    """, (
-        user_id,
-        months,
-        start.strftime("%Y-%m-%d"),
-        end.strftime("%Y-%m-%d")
-    ))
+    INSERT INTO subscriptions (user_id, months, start, end, config)
+    VALUES (?, ?, ?, ?, ?)
+    """, (user_id, months, start.isoformat(), end.isoformat(), config))
 
     conn.commit()
     conn.close()
 
-
-def get_user_subscriptions(user_id):
-
+def get_subs(user_id):
     conn = connect()
     cur = conn.cursor()
-
-    cur.execute(
-        "SELECT months,start,end FROM subscriptions WHERE user_id=?",
-        (user_id,)
-    )
-
-    rows = cur.fetchall()
+    cur.execute("SELECT months, start, end, config FROM subscriptions WHERE user_id=?", (user_id,))
+    subs = cur.fetchall()
     conn.close()
-
-    result = []
-
-    for r in rows:
-        result.append({
-            "months": r[0],
-            "start": r[1],
-            "end": r[2]
-        })
-
-    return result
-
-
-def get_user_points(user_id):
-
-    add_user(user_id)
-
-    conn = connect()
-    cur = conn.cursor()
-
-    cur.execute(
-        "SELECT points FROM users WHERE user_id=?",
-        (user_id,)
-    )
-
-    row = cur.fetchone()
-    conn.close()
-
-    return row[0] if row else 0
-
-
-def use_points(user_id, amount):
-
-    add_user(user_id)
-
-    conn = connect()
-    cur = conn.cursor()
-
-    cur.execute(
-        "SELECT points FROM users WHERE user_id=?",
-        (user_id,)
-    )
-
-    row = cur.fetchone()
-
-    if not row:
-        conn.close()
-        return False
-
-    points = row[0]
-
-    if points < amount:
-        conn.close()
-        return False
-
-    cur.execute(
-        "UPDATE users SET points = points - ? WHERE user_id=?",
-        (amount, user_id)
-    )
-
-    conn.commit()
-    conn.close()
-
-    return True
+    return subs
