@@ -1,5 +1,6 @@
-from .buy import register_buy_handlers
+from .buy import buy_menu
 
 
 def register_handlers(bot):
-    register_buy_handlers(bot)
+
+    buy_menu(bot)
