@@ -1,15 +1,7 @@
-from database import create_tables, create_users_table
+from database import create_tables
 from bot import bot
 
+create_tables()
 
-def main():
-    # ساخت جدول‌های دیتابیس
-    create_tables()
-    create_users_table()
-
-    print("Bot is running...")
-    bot.infinity_polling(skip_pending=True)
-
-
-if __name__ == "__main__":
-    main()
+print("Bot running...")
+bot.infinity_polling()
