@@ -1,55 +1,37 @@
 import telebot
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
-
 from config import BOT_TOKEN
-from database import create_tables, add_user
+from database import create_tables
 from handlers import register_handlers
+from telebot.types import ReplyKeyboardMarkup
 
 
-# ---------- ساخت ربات ----------
 bot = telebot.TeleBot(BOT_TOKEN)
 
-
-# ---------- ساخت دیتابیس ----------
+# ساخت دیتابیس
 create_tables()
 
 
-# ---------- منوی اصلی ----------
+# ---------------- منوی اصلی ----------------
 def main_menu():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
 
-    markup.row(
-        KeyboardButton("💳 خرید اشتراک"),
-        KeyboardButton("📦 اشتراک های من")
-    )
-
-    markup.row(
-        KeyboardButton("🏆 امتیاز من"),
-        KeyboardButton("📚 آموزش خرید")
-    )
-
-    markup.row(
-        KeyboardButton("🛠 پشتیبانی")
-    )
+    markup.row("💳 خرید اشتراک", "📦 اشتراک های من")
+    markup.row("🏆 امتیاز های من", "📚 آموزش خرید")
+    markup.row("🛠 پشتیبانی")
 
     return markup
 
 
-# ---------- استارت ----------
+# ---------------- استارت ----------------
 @bot.message_handler(commands=['start'])
 def start(message):
 
-    user_id = message.from_user.id
-
-    # ثبت کاربر در دیتابیس
-    add_user(user_id)
-
     text = """
-❤️ سلام دوست عزیز
+♥️ سلام دوست عزیز
 
-به ربات فروش VPN خوش آمدید
+به ربات پینگ خور خوش اومدی
 
-👇 یکی از گزینه های زیر را انتخاب کنید
+⬇️ لطفا یک گزینه را انتخاب کن
 """
 
     bot.send_message(
@@ -59,10 +41,9 @@ def start(message):
     )
 
 
-# ---------- ثبت سایر منوها ----------
+# ثبت هندلرها
 register_handlers(bot)
 
 
-# ---------- اجرای ربات ----------
 print("Bot is running...")
 bot.infinity_polling()
