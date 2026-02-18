@@ -1,18 +1,18 @@
 import telebot
 from config import BOT_TOKEN
-from database import create_tables, add_subscription
+from database import create_tables, create_users_table, add_user
 from handlers import register_handlers
 from telebot.types import ReplyKeyboardMarkup
-from datetime import datetime, timedelta
 
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ساخت دیتابیس
 create_tables()
+create_users_table()
 
 
 # ---------------- منوی اصلی ----------------
+
 def main_menu():
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
 
@@ -24,8 +24,14 @@ def main_menu():
 
 
 # ---------------- استارت ----------------
+
 @bot.message_handler(commands=['start'])
 def start(message):
+
+    args = message.text.split()
+    referral = args[1] if len(args) > 1 else None
+
+    add_user(message.from_user.id, referral)
 
     text = """
 ♥️ سلام دوست عزیز
@@ -42,34 +48,7 @@ def start(message):
     )
 
 
-# ---------------- تست ساخت اشتراک ----------------
-@bot.message_handler(commands=['testsub'])
-def test_sub(message):
-
-    user_id = message.from_user.id
-
-    buy_date = datetime.now().strftime("%Y-%m-%d")
-    expire_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
-
-    data = (
-        user_id,
-        buy_date,
-        expire_date,
-        "36GB",
-        "TEST_PRIVATE_KEY",
-        "10.0.0.2/32",
-        "TEST_SERVER_KEY",
-        "1.1.1.1:51820"
-    )
-
-    add_subscription(data)
-
-    bot.send_message(message.chat.id, "✅ اشتراک تستی ساخته شد")
-
-
-# ثبت هندلرها
 register_handlers(bot)
-
 
 print("Bot is running...")
 bot.infinity_polling()
