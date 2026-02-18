@@ -1,42 +1,38 @@
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from database import create_subscription
 
 
 def register_buy_handlers(bot):
 
     @bot.message_handler(func=lambda m: m.text == "🛒 خرید اشتراک")
-    def buy_subscription(message):
+    def buy_menu(message):
 
-        markup = InlineKeyboardMarkup()
-
-        markup.add(
-            InlineKeyboardButton("اشتراک 1 ماهه", callback_data="sub_1"),
-            InlineKeyboardButton("اشتراک 3 ماهه", callback_data="sub_3"),
-            InlineKeyboardButton("اشتراک 6 ماهه", callback_data="sub_6")
+        kb = InlineKeyboardMarkup()
+        kb.add(
+            InlineKeyboardButton("یک ماهه", callback_data="buy_1"),
+            InlineKeyboardButton("دو ماهه", callback_data="buy_2"),
+            InlineKeyboardButton("سه ماهه", callback_data="buy_3"),
         )
 
         bot.send_message(
             message.chat.id,
-            "📦 یکی از پلن ها را انتخاب کن:",
-            reply_markup=markup
+            "پلن مورد نظر را انتخاب کن:",
+            reply_markup=kb
         )
 
+    @bot.callback_query_handler(func=lambda c: c.data.startswith("buy_"))
+    def buy_callback(call):
 
-    # انتخاب پلن
-    @bot.callback_query_handler(func=lambda call: call.data.startswith("sub_"))
-    def choose_plan(call):
+        user_id = call.from_user.id
+        plan = call.data.split("_")[1]
 
-        if call.data == "sub_1":
-            price = "100 هزار تومان"
+        months = int(plan)
 
-        elif call.data == "sub_3":
-            price = "250 هزار تومان"
-
-        elif call.data == "sub_6":
-            price = "400 هزار تومان"
+        create_subscription(user_id, months)
 
         bot.answer_callback_query(call.id)
-
         bot.send_message(
             call.message.chat.id,
-            f"💰 قیمت پلن انتخابی:\n{price}\n\nبرای پرداخت با ادمین تماس بگیر."
+            "✅ اشتراک با موفقیت ثبت شد\n"
+            "فعلا پرداخت تستی است"
         )
