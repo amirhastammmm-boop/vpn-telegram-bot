@@ -1,11 +1,9 @@
 from telebot import TeleBot
-import os
+import config
 from database import create_tables
 from handlers import register_handlers
 
-TOKEN = os.getenv("BOT_TOKEN")
-
-bot = TeleBot(TOKEN)
+bot = TeleBot(config.BOT_TOKEN)
 
 create_tables()
 register_handlers(bot)
