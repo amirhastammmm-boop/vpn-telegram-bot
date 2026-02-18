@@ -1,41 +1,26 @@
-import telebot
-from config import BOT_TOKEN
-from database import create_tables
-from handlers import register_handlers
-from telebot.types import ReplyKeyboardMarkup
+from database import add_subscription
+from datetime import datetime, timedelta
 
 
-bot = telebot.TeleBot(BOT_TOKEN)
+@bot.message_handler(commands=['testsub'])
+def test_sub(message):
 
-create_tables()
+    user_id = message.from_user.id
 
+    buy_date = datetime.now().strftime("%Y-%m-%d")
+    expire_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
 
-def main_menu():
+    data = (
+        user_id,
+        buy_date,
+        expire_date,
+        "36GB",
+        "TEST_PRIVATE_KEY",
+        "10.0.0.2/32",
+        "TEST_SERVER_KEY",
+        "1.1.1.1:51820"
+    )
 
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    add_subscription(data)
 
-    markup.row("💳 خرید اشتراک", "📦 اشتراک های من")
-    markup.row("🏆 امتیاز های من", "📚 آموزش خرید")
-    markup.row("🛠 پشتیبانی")
-
-    return markup
-
-
-@bot.message_handler(commands=['start'])
-def start(message):
-
-    text = """
-♥️ سلام دوست عزیز
-
-به ربات پینگ خور خوش اومدی
-
-⬇️ لطفا یک گزینه را انتخاب کن
-"""
-
-    bot.send_message(message.chat.id, text, reply_markup=main_menu())
-
-
-register_handlers(bot)
-
-print("Bot is running...")
-bot.infinity_polling()
+    bot.send_message(message.chat.id, "✅ اشتراک تستی ساخته شد")
