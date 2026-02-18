@@ -7,12 +7,11 @@ from telebot.types import ReplyKeyboardMarkup
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ساخت دیتابیس
 create_tables()
 
 
-# ---------------- منوی اصلی ----------------
 def main_menu():
+
     markup = ReplyKeyboardMarkup(resize_keyboard=True)
 
     markup.row("💳 خرید اشتراک", "📦 اشتراک های من")
@@ -22,7 +21,6 @@ def main_menu():
     return markup
 
 
-# ---------------- استارت ----------------
 @bot.message_handler(commands=['start'])
 def start(message):
 
@@ -34,16 +32,10 @@ def start(message):
 ⬇️ لطفا یک گزینه را انتخاب کن
 """
 
-    bot.send_message(
-        message.chat.id,
-        text,
-        reply_markup=main_menu()
-    )
+    bot.send_message(message.chat.id, text, reply_markup=main_menu())
 
 
-# ثبت هندلرها
 register_handlers(bot)
-
 
 print("Bot is running...")
 bot.infinity_polling()
