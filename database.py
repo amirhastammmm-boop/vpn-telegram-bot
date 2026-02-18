@@ -2,12 +2,20 @@ import sqlite3
 import random
 import string
 
+DB_NAME = "bot.db"
 
-# ---------------- ساخت جدول ها ----------------
+
+# ---------------- اتصال ----------------
+
+def get_conn():
+    return sqlite3.connect(DB_NAME)
+
+
+# ---------------- جدول اشتراک ----------------
 
 def create_tables():
 
-    conn = sqlite3.connect("bot.db")
+    conn = get_conn()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -28,11 +36,11 @@ def create_tables():
     conn.close()
 
 
-# ---------------- جدول کاربران و امتیاز ----------------
+# ---------------- جدول کاربران ----------------
 
 def create_users_table():
 
-    conn = sqlite3.connect("bot.db")
+    conn = get_conn()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -48,43 +56,7 @@ def create_users_table():
     conn.close()
 
 
-# ---------------- افزودن اشتراک ----------------
-
-def add_subscription(data):
-
-    conn = sqlite3.connect("bot.db")
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        INSERT INTO subscriptions
-        (user_id, buy_date, expire_date, volume,
-         private_key, address, server_public_key, endpoint)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, data)
-
-    conn.commit()
-    conn.close()
-
-
-# ---------------- گرفتن اشتراک های کاربر ----------------
-
-def get_user_subscriptions(user_id):
-
-    conn = sqlite3.connect("bot.db")
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT * FROM subscriptions WHERE user_id=?",
-        (user_id,)
-    )
-
-    subs = cursor.fetchall()
-    conn.close()
-
-    return subs
-
-
-# ---------------- سیستم رفرال ----------------
+# ---------------- رفرال ----------------
 
 def generate_referral_code():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
@@ -92,13 +64,11 @@ def generate_referral_code():
 
 def add_user(user_id, referral_code=None):
 
-    conn = sqlite3.connect("bot.db")
+    conn = get_conn()
     cursor = conn.cursor()
 
     cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
-    user = cursor.fetchone()
-
-    if user:
+    if cursor.fetchone():
         conn.close()
         return
 
@@ -128,12 +98,25 @@ def add_user(user_id, referral_code=None):
 
 def get_user_points(user_id):
 
-    conn = sqlite3.connect("bot.db")
+    conn = get_conn()
     cursor = conn.cursor()
 
     cursor.execute("SELECT points FROM users WHERE user_id=?", (user_id,))
-    result = cursor.fetchone()
+    row = cursor.fetchone()
 
     conn.close()
 
-    return result[0] if result else 0
+    return row[0] if row else 0
+
+
+def get_inviter(user_id):
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT invited_by FROM users WHERE user_id=?", (user_id,))
+    row = cursor.fetchone()
+
+    conn.close()
+
+    return row[0] if row else None
