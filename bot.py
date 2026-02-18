@@ -59,4 +59,3 @@ register_handlers(bot)
 
 print("Bot is running...")
 bot.infinity_polling(skip_pending=True)
-```0
