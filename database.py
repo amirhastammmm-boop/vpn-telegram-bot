@@ -67,6 +67,7 @@ def add_user(user_id, referral_code=None):
     conn = get_conn()
     cursor = conn.cursor()
 
+    # اگر کاربر قبلا ثبت شده
     cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
     if cursor.fetchone():
         conn.close()
@@ -75,13 +76,19 @@ def add_user(user_id, referral_code=None):
     my_code = generate_referral_code()
     invited_by = None
 
+    # بررسی کد رفرال
     if referral_code:
-        cursor.execute("SELECT user_id FROM users WHERE referral_code=?", (referral_code,))
+        cursor.execute(
+            "SELECT user_id FROM users WHERE referral_code=?",
+            (referral_code,)
+        )
         inviter = cursor.fetchone()
 
+        # جلوگیری از تقلب
         if inviter and inviter[0] != user_id:
             invited_by = inviter[0]
 
+            # دادن امتیاز دعوت
             cursor.execute(
                 "UPDATE users SET points = points + 1 WHERE user_id=?",
                 (invited_by,)
@@ -96,6 +103,8 @@ def add_user(user_id, referral_code=None):
     conn.close()
 
 
+# ---------------- امتیاز ----------------
+
 def get_user_points(user_id):
 
     conn = get_conn()
@@ -109,14 +118,83 @@ def get_user_points(user_id):
     return row[0] if row else 0
 
 
+def add_points(user_id, amount):
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE users
+        SET points = points + ?
+        WHERE user_id=?
+    """, (amount, user_id))
+
+    conn.commit()
+    conn.close()
+
+
+def remove_points(user_id, amount):
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE users
+        SET points = points - ?
+        WHERE user_id=? AND points >= ?
+    """, (amount, user_id, amount))
+
+    conn.commit()
+    conn.close()
+
+
+# ---------------- دعوت کننده ----------------
+
 def get_inviter(user_id):
 
     conn = get_conn()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT invited_by FROM users WHERE user_id=?", (user_id,))
-    row = cursor.fetchone()
+    cursor.execute("""
+        SELECT invited_by FROM users WHERE user_id=?
+    """, (user_id,))
 
+    row = cursor.fetchone()
     conn.close()
 
     return row[0] if row else None
+
+
+# ---------------- گرفتن کد رفرال ----------------
+
+def get_referral_code(user_id):
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT referral_code FROM users WHERE user_id=?
+    """, (user_id,))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    return row[0] if row else None
+
+
+# ---------------- گرفتن اشتراک ها ----------------
+
+def get_user_subscriptions(user_id):
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT * FROM subscriptions
+        WHERE user_id=?
+    """, (user_id,))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return rows
