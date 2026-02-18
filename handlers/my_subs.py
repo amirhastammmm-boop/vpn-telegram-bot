@@ -1,24 +1,19 @@
-from database import get_subs
+from telegram import Update
+from telegram.ext import ContextTypes, MessageHandler, filters
+from database import get_user_subscriptions
 
-def register_my_sub_handlers(bot):
+async def my_subs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    subs = get_user_subscriptions(update.effective_user.id)
 
-    @bot.message_handler(func=lambda m: m.text == "📦 اشتراک های من")
-    def my_subs(message):
+    if not subs:
+        await update.message.reply_text("❌ اشتراکی نداری")
+        return
 
-        subs = get_subs(message.from_user.id)
+    text = "📦 اشتراک های شما:\n\n"
+    for sub in subs:
+        text += f"کد: {sub}\n"
 
-        if not subs:
-            bot.send_message(message.chat.id, "❌ اشتراکی نداری")
-            return
+    await update.message.reply_text(text)
 
-        text = "📦 اشتراک های شما:\n\n"
-
-        for s in subs:
-            months, start, end, config = s
-            text += (
-                f"{months} ماهه\n"
-                f"شروع: {start[:10]}\n"
-                f"پایان: {end[:10]}\n\n"
-            )
-
-        bot.send_message(message.chat.id, text)
+def register_my_sub_handlers(app):
+    app.add_handler(MessageHandler(filters.Regex("📦 اشتراک های من"), my_subs))
