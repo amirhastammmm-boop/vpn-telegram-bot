@@ -1,9 +1,10 @@
 from database import create_tables, create_users_table
-from bot import bot   # اگر اسم فایل بوتت چیز دیگه بود بگو اصلاح کنم
+from bot import bot
 
-# ساخت جدول ها
+# ساخت جدول های دیتابیس
 create_tables()
 create_users_table()
 
 # اجرای ربات
-bot.run()
+print("Bot is running...")
+bot.infinity_polling()
