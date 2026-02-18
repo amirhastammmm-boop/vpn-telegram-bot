@@ -18,16 +18,19 @@ def register_start_handler(bot):
             args = message.text.split()
 
             if len(args) > 1:
-                referrer_id = int(args[1])
+                try:
+                    referrer_id = int(args[1])
 
-                if referrer_id != user_id:
-                    add_points(referrer_id, 5)
+                    if referrer_id != user_id and get_user(referrer_id):
+                        add_points(referrer_id, 5)
 
-                    bot.send_message(
-                        referrer_id,
-                        "🎉 یک نفر با لینک رفرال شما عضو شد!\n"
-                        "➕ 5 امتیاز دریافت کردی"
-                    )
+                        bot.send_message(
+                            referrer_id,
+                            "🎉 یک نفر با لینک رفرال شما عضو شد!\n"
+                            "➕ 5 امتیاز دریافت کردی"
+                        )
+                except:
+                    pass
 
         # منوی اصلی
         markup = InlineKeyboardMarkup(row_width=2)
@@ -42,3 +45,4 @@ def register_start_handler(bot):
             f"سلام {first_name} 👋\nبه ربات خوش اومدی ❤️",
             reply_markup=markup
         )
+```0
