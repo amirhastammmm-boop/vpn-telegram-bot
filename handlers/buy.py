@@ -2,11 +2,10 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import NEXT_PAY_LINKS
 
 
-# ------------------- ثبت هندلر خرید -------------------
-
 def register_buy_handlers(bot):
 
     # ------------------- منو خرید اشتراک -------------------
+
     @bot.message_handler(func=lambda m: m.text == "💳 خرید اشتراک")
     def buy_start(message):
 
@@ -27,6 +26,7 @@ def register_buy_handlers(bot):
 
 
     # ------------------- ادامه خرید -------------------
+
     @bot.callback_query_handler(func=lambda call: call.data == "continue_buy")
     def continue_buy(call):
 
@@ -49,6 +49,7 @@ def register_buy_handlers(bot):
 
 
     # ------------------- انتخاب پلن -------------------
+
     @bot.callback_query_handler(func=lambda call: call.data == "choose_plan")
     def choose_plan(call):
 
