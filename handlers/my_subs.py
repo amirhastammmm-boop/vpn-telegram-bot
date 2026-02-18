@@ -1,5 +1,5 @@
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from database import get_user_subscriptions
+from database import get_user_subscriptions, get_subscription_file
 
 
 def register_my_sub_handlers(bot):
@@ -45,7 +45,19 @@ def register_my_sub_handlers(bot):
 
         bot.answer_callback_query(call.id)
 
+        sub_id = int(call.data.split("_")[1])
+
+        file_link = get_subscription_file(sub_id)
+
+        if not file_link:
+            bot.send_message(
+                call.message.chat.id,
+                "❌ فایل این اشتراک یافت نشد"
+            )
+            return
+
         bot.send_message(
             call.message.chat.id,
-            "⚙️ ساخت فایل هنوز اضافه نشده"
+            f"📄 فایل اشتراک شما:\n{file_link}"
         )
+```0
