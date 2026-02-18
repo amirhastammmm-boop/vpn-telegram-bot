@@ -1,5 +1,6 @@
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from database import get_user_points
+from database import get_user_points, decrease_points, create_subscription
+from datetime import datetime, timedelta
 
 
 def register_points_handlers(bot):
@@ -46,4 +47,5 @@ def register_points_handlers(bot):
             bot.answer_callback_query(call.id, "❌ امتیاز کافی نیست")
             return
 
-        bot.send_message(call.message.chat.id, f"✅ اشتراک {months} ماهه ساخته شد")
+        # کم کردن امتیاز
+        decrease_points(user_id
