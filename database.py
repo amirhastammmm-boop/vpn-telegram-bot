@@ -1,5 +1,5 @@
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from database import get_user, add_user, add_points
+from database import add_user, get_user
 
 
 def register_start_handler(bot):
@@ -10,26 +10,20 @@ def register_start_handler(bot):
         user_id = message.from_user.id
         first_name = message.from_user.first_name
 
-        # بررسی وجود کاربر
+        args = message.text.split()
+
+        # اگر کاربر قبلا ثبت نشده بود
         if not get_user(user_id):
-            add_user(user_id)
 
-            # بررسی رفرال
-            args = message.text.split()
-
+            # اگر با کد رفرال وارد شده
             if len(args) > 1:
-                referrer_id = int(args[1])
+                referral_code = args[1]
+                add_user(user_id, referral_code)
 
-                if referrer_id != user_id:
-                    add_points(referrer_id, 5)
+            else:
+                add_user(user_id)
 
-                    bot.send_message(
-                        referrer_id,
-                        "🎉 یک نفر با لینک رفرال شما عضو شد!\n"
-                        "➕ 5 امتیاز دریافت کردی"
-                    )
-
-        # منوی اصلی
+        # ---------- منوی اصلی ----------
         markup = InlineKeyboardMarkup(row_width=2)
 
         markup.add(
