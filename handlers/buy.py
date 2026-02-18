@@ -2,17 +2,17 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import NEXT_PAY_LINKS
 
 
-# ---------------- منو خرید اشتراک ----------------
+# ------------------- منو خرید اشتراک -------------------
 
 def buy_menu(bot):
 
-    @bot.message_handler(func=lambda m: m.text == "💳 خرید اشتراک")
+    @bot.message_handler(func=lambda m: m.text == "🛒 خرید اشتراک")
     def buy_start(message):
 
         text = """
-منو خرید اشتراک:
+🛒 منو خرید اشتراک:
 
-⚠️ توجه داشته باشید هر باری که خرید میکنید یک اشتراک جدید با فایل های جدید دریافت میکنید و اشتراک هایی که قبلا تمام شده اند تمدید نمیشوند و باید از فایل های اشتراک جدید استفاده کنید
+⚠️ اشتراک های قبلی تمدید نمیشوند و باید از فایل جدید استفاده کنید
 
 ✅ برای ادامه دکمه زیر را فشار دهید
 """
@@ -25,18 +25,18 @@ def buy_menu(bot):
         bot.send_message(message.chat.id, text, reply_markup=keyboard)
 
 
-# ---------------- ادامه خرید ----------------
+# ------------------- ادامه خرید -------------------
 
     @bot.callback_query_handler(func=lambda call: call.data == "continue_buy")
     def continue_buy(call):
 
-        text = "👈 لطفا یک گزینه را انتخاب کنید"
+        text = "👉 لطفا یک گزینه را انتخاب کنید"
 
         keyboard = InlineKeyboardMarkup()
         keyboard.add(
             InlineKeyboardButton(
                 "خرید با درگاه پرداخت مستقیم",
-                callback_data="direct_payment"
+                callback_data="choose_plan"
             )
         )
 
@@ -48,9 +48,9 @@ def buy_menu(bot):
         )
 
 
-# ---------------- انتخاب پلن ----------------
+# ------------------- انتخاب پلن -------------------
 
-    @bot.callback_query_handler(func=lambda call: call.data == "direct_payment")
+    @bot.callback_query_handler(func=lambda call: call.data == "choose_plan")
     def choose_plan(call):
 
         text = "💳 یکی از پلن های زیر را انتخاب کنید"
