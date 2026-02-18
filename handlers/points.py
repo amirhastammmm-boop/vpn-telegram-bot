@@ -11,11 +11,9 @@ def register_points_handlers(bot):
             bot.send_message(message.chat.id, "خطا ❌")
             return
 
-        pts = user[3]
+        pts = user[2]
 
         bot.send_message(
             message.chat.id,
-            f"🏆 امتیاز شما: {pts}\n\n"
-            "5 امتیاز = 1 ماه\n"
-            "9 امتیاز = 2 ماه"
+            f"🏆 امتیاز شما: {pts}"
         )
