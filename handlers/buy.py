@@ -78,3 +78,4 @@ def register_buy_handlers(bot):
             call.message.message_id,
             reply_markup=keyboard
         )
+```0
