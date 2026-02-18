@@ -1,12 +1,29 @@
-from .buy import register_buy_handlers
-from .my_subs import register_my_sub_handlers
-from .points import register_points_handlers
-from .start import register_start_handler
+from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from database import add_user
 
 
-def register_handlers(bot):
+def main_menu():
+    kb = ReplyKeyboardMarkup(resize_keyboard=True)
 
-    register_start_handler(bot)
-    register_buy_handlers(bot)
-    register_my_sub_handlers(bot)
-    register_points_handlers(bot)
+    kb.add(KeyboardButton("🛒 خرید اشتراک"))
+    kb.add(KeyboardButton("📦 اشتراک های من"))
+    kb.add(KeyboardButton("🏆 امتیاز های من"))
+
+    return kb
+
+
+def register_start_handlers(bot):
+
+    @bot.message_handler(commands=['start'])
+    def start(message):
+
+        user_id = message.from_user.id
+        add_user(user_id)
+
+        bot.send_message(
+            message.chat.id,
+            "❤️ سلام دوست عزیز\n"
+            "به ربات خوش اومدی\n\n"
+            "لطفا یک گزینه را انتخاب کن 👇",
+            reply_markup=main_menu()
+        )
