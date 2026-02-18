@@ -1,28 +1,23 @@
-from telebot import types
-from database import create_user
+from telegram import Update
+from telegram.ext import ContextTypes
+from keyboards import main_menu
+from database import add_user_if_not_exists
 
-def register_start_handlers(bot):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
 
-    @bot.message_handler(commands=['start'])
-    def start(message):
-        args = message.text.split()
-        invited_by = None
+    referral_code = None
+    if context.args:
+        referral_code = context.args[0]
 
-        if len(args) > 1:
-            try:
-                invited_by = int(args[1])
-            except:
-                invited_by = None
+    add_user_if_not_exists(user.id, referral_code)
 
-        create_user(message.from_user.id, invited_by)
+    await update.message.reply_text(
+        "❤️ سلام دوست عزیز\n"
+        "به ربات خوش اومدی\n\n"
+        "یکی از گزینه ها رو انتخاب کن 👇",
+        reply_markup=main_menu()
+    )
 
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        markup.add("💳 خرید اشتراک")
-        markup.add("📦 اشتراک های من")
-        markup.add("🏆 امتیاز های من")
-
-        bot.send_message(
-            message.chat.id,
-            "خوش اومدی 👋",
-            reply_markup=markup
-        )
+def register_start_handlers(app):
+    app.add_handler(CommandHandler("start", start))
