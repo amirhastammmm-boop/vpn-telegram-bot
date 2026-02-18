@@ -1,96 +1,147 @@
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from database import add_user, get_user, add_points, get_user_points
+import sqlite3
+from datetime import datetime, timedelta
+
+DB_NAME = "bot.db"
 
 
-def register_start_handler(bot):
-
-    # ---------- استارت ----------
-    @bot.message_handler(commands=['start'])
-    def start(message):
-
-        user_id = message.from_user.id
-        first_name = message.from_user.first_name
-        args = message.text.split()
-
-        # اگر کاربر قبلا ثبت نشده بود
-        if not get_user(user_id):
-
-            # اگر با رفرال وارد شده
-            if len(args) > 1:
-                try:
-                    referrer_id = int(args[1])
-
-                    if referrer_id != user_id:
-                        add_user(user_id, referrer_id)
-                        add_points(referrer_id, 5)
-
-                        bot.send_message(
-                            referrer_id,
-                            "🎉 یک نفر با لینک شما عضو شد!\n➕ 5 امتیاز گرفتی"
-                        )
-                    else:
-                        add_user(user_id)
-
-                except:
-                    add_user(user_id)
-
-            else:
-                add_user(user_id)
-
-        send_main_menu(message.chat.id, first_name)
+def connect():
+    return sqlite3.connect(DB_NAME)
 
 
-    # ---------- منوی اصلی ----------
-    def send_main_menu(chat_id, name):
+# =========================
+# ساخت جدول ها
+# =========================
 
-        markup = InlineKeyboardMarkup(row_width=2)
+def create_tables():
 
-        markup.add(
-            InlineKeyboardButton("👤 حساب کاربری", callback_data="profile"),
-            InlineKeyboardButton("🎁 دعوت دوستان", callback_data="referral")
-        )
+    conn = connect()
+    cur = conn.cursor()
 
-        bot.send_message(
-            chat_id,
-            f"سلام {name} 👋\nبه ربات خوش اومدی ❤️",
-            reply_markup=markup
-        )
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        buy_date TEXT,
+        expire_date TEXT,
+        volume TEXT
+    )
+    """)
 
-
-    # ---------- پروفایل ----------
-    @bot.callback_query_handler(func=lambda c: c.data == "profile")
-    def profile(call):
-
-        user_id = call.from_user.id
-        points = get_user_points(user_id)
-
-        text = f"""
-👤 پروفایل شما
-
-🆔 آیدی عددی: {user_id}
-🏆 امتیاز: {points}
-"""
-
-        bot.answer_callback_query(call.id)
-        bot.send_message(call.message.chat.id, text)
+    conn.commit()
+    conn.close()
 
 
-    # ---------- دعوت دوستان ----------
-    @bot.callback_query_handler(func=lambda c: c.data == "referral")
-    def referral(call):
+def create_users_table():
 
-        user_id = call.from_user.id
-        bot_username = bot.get_me().username
+    conn = connect()
+    cur = conn.cursor()
 
-        link = f"https://t.me/{bot_username}?start={user_id}"
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        user_id INTEGER PRIMARY KEY,
+        referral TEXT,
+        points INTEGER DEFAULT 0
+    )
+    """)
 
-        text = f"""
-🎁 لینک دعوت شما:
+    conn.commit()
+    conn.close()
 
-{link}
 
-با دعوت هر نفر 5 امتیاز میگیری ✅
-"""
+# =========================
+# USER
+# =========================
 
-        bot.answer_callback_query(call.id)
-        bot.send_message(call.message.chat.id, text)
+def add_user(user_id, referral=None):
+
+    conn = connect()
+    cur = conn.cursor()
+
+    cur.execute(
+        "INSERT OR IGNORE INTO users (user_id, referral) VALUES (?, ?)",
+        (user_id, referral)
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_user(user_id):
+
+    conn = connect()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
+    user = cur.fetchone()
+
+    conn.close()
+    return user
+
+
+def add_points(user_id, amount):
+
+    conn = connect()
+    cur = conn.cursor()
+
+    cur.execute(
+        "UPDATE users SET points = points + ? WHERE user_id=?",
+        (amount, user_id)
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_user_points(user_id):
+
+    conn = connect()
+    cur = conn.cursor()
+
+    cur.execute("SELECT points FROM users WHERE user_id=?", (user_id,))
+    row = cur.fetchone()
+
+    conn.close()
+
+    return row[0] if row else 0
+
+
+# =========================
+# SUBSCRIPTIONS
+# =========================
+
+def add_subscription(user_id, days, volume):
+
+    conn = connect()
+    cur = conn.cursor()
+
+    buy_date = datetime.now()
+    expire_date = buy_date + timedelta(days=days)
+
+    cur.execute("""
+        INSERT INTO subscriptions (user_id, buy_date, expire_date, volume)
+        VALUES (?, ?, ?, ?)
+    """, (
+        user_id,
+        buy_date.strftime("%Y-%m-%d"),
+        expire_date.strftime("%Y-%m-%d"),
+        volume
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+def get_user_subscriptions(user_id):
+
+    conn = connect()
+    cur = conn.cursor()
+
+    cur.execute(
+        "SELECT * FROM subscriptions WHERE user_id=?",
+        (user_id,)
+    )
+
+    subs = cur.fetchall()
+
+    conn.close()
+    return subs
