@@ -1,4 +1,4 @@
-from database import get_user, add_points, create_subscription
+from database import get_user
 
 def register_points_handlers(bot):
 
@@ -6,9 +6,16 @@ def register_points_handlers(bot):
     def points(message):
 
         user = get_user(message.from_user.id)
+
+        if not user:
+            bot.send_message(message.chat.id, "خطا ❌")
+            return
+
         pts = user[3]
 
         bot.send_message(
             message.chat.id,
-            f"امتیاز شما: {pts}\n\n5 امتیاز = 1 ماه\n9 امتیاز = 2 ماه"
+            f"🏆 امتیاز شما: {pts}\n\n"
+            "5 امتیاز = 1 ماه\n"
+            "9 امتیاز = 2 ماه"
         )
