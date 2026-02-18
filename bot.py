@@ -1,21 +1,53 @@
-import os
 import telebot
+from config import BOT_TOKEN
+from database import create_tables, add_user
 from handlers import register_handlers
+from telebot.types import ReplyKeyboardMarkup
 
-# گرفتن توکن از Railway ENV
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-if not BOT_TOKEN:
-    raise Exception("BOT_TOKEN not found in environment variables")
-
-# ساخت ربات
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ثبت همه هندلرها
+# ساخت دیتابیس
+create_tables()
+
+
+# ---------------- منوی اصلی ----------------
+def main_menu():
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+
+    markup.row("💳 خرید اشتراک", "📦 اشتراک های من")
+    markup.row("🏆 امتیاز های من", "📚 آموزش خرید")
+    markup.row("🛠 پشتیبانی")
+
+    return markup
+
+
+# ---------------- استارت ----------------
+@bot.message_handler(commands=['start'])
+def start(message):
+
+    args = message.text.split()
+    referral = args[1] if len(args) > 1 else None
+
+    add_user(message.from_user.id)
+
+    text = """
+♥️ سلام دوست عزیز
+
+به ربات پینگ خور خوش اومدی
+
+⬇️ لطفا یک گزینه را انتخاب کن
+"""
+
+    bot.send_message(
+        message.chat.id,
+        text,
+        reply_markup=main_menu()
+    )
+
+
+# ثبت هندلرها
 register_handlers(bot)
 
 
-# اجرا
-if __name__ == "__main__":
-    print("Bot is running...")
-    bot.infinity_polling(skip_pending=True)
+print("Bot is running...")
+bot.infinity_polling()
