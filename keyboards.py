@@ -1,20 +1,18 @@
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
-
+from telegram import ReplyKeyboardMarkup
 
 def main_menu():
+    keyboard = [
+        ["🛒 خرید اشتراک", "📦 اشتراک های من"],
+        ["🏆 امتیاز های من", "📘 آموزش"],
+        ["🛠 پشتیبانی"]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
-
-    btn1 = KeyboardButton("🛒 خرید اشتراک")
-    btn2 = KeyboardButton("📦 اشتراک های من")
-
-    btn3 = KeyboardButton("🏆 امتیاز های من")
-    btn4 = KeyboardButton("📚 آموزش خرید")
-
-    btn5 = KeyboardButton("🎧 پشتیبانی")
-
-    markup.row(btn1, btn2)
-    markup.row(btn3, btn4)
-    markup.row(btn5)
-
-    return markup
+def buy_menu():
+    keyboard = [
+        ["1 ماهه"],
+        ["2 ماهه"],
+        ["3 ماهه"],
+        ["🔙 بازگشت"]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
