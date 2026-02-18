@@ -35,13 +35,18 @@ def add_user(user_id):
     conn = connect()
     cur = conn.cursor()
 
-    cur.execute("INSERT OR IGNORE INTO users(user_id) VALUES(?)", (user_id,))
+    cur.execute(
+        "INSERT OR IGNORE INTO users(user_id) VALUES(?)",
+        (user_id,)
+    )
 
     conn.commit()
     conn.close()
 
 
 def create_subscription(user_id, months):
+
+    add_user(user_id)
 
     start = datetime.now()
     end = start + timedelta(days=30 * months)
@@ -52,7 +57,12 @@ def create_subscription(user_id, months):
     cur.execute("""
         INSERT INTO subscriptions(user_id, months, start, end)
         VALUES(?,?,?,?)
-    """, (user_id, months, start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")))
+    """, (
+        user_id,
+        months,
+        start.strftime("%Y-%m-%d"),
+        end.strftime("%Y-%m-%d")
+    ))
 
     conn.commit()
     conn.close()
@@ -63,12 +73,16 @@ def get_user_subscriptions(user_id):
     conn = connect()
     cur = conn.cursor()
 
-    cur.execute("SELECT months,start,end FROM subscriptions WHERE user_id=?", (user_id,))
-    rows = cur.fetchall()
+    cur.execute(
+        "SELECT months,start,end FROM subscriptions WHERE user_id=?",
+        (user_id,)
+    )
 
+    rows = cur.fetchall()
     conn.close()
 
     result = []
+
     for r in rows:
         result.append({
             "months": r[0],
@@ -81,12 +95,17 @@ def get_user_subscriptions(user_id):
 
 def get_user_points(user_id):
 
+    add_user(user_id)
+
     conn = connect()
     cur = conn.cursor()
 
-    cur.execute("SELECT points FROM users WHERE user_id=?", (user_id,))
-    row = cur.fetchone()
+    cur.execute(
+        "SELECT points FROM users WHERE user_id=?",
+        (user_id,)
+    )
 
+    row = cur.fetchone()
     conn.close()
 
     return row[0] if row else 0
@@ -94,16 +113,32 @@ def get_user_points(user_id):
 
 def use_points(user_id, amount):
 
+    add_user(user_id)
+
     conn = connect()
     cur = conn.cursor()
 
-    cur.execute("SELECT points FROM users WHERE user_id=?", (user_id,))
-    points = cur.fetchone()[0]
+    cur.execute(
+        "SELECT points FROM users WHERE user_id=?",
+        (user_id,)
+    )
 
-    if points < amount:
+    row = cur.fetchone()
+
+    if not row:
+        conn.close()
         return False
 
-    cur.execute("UPDATE users SET points=points-? WHERE user_id=?", (amount, user_id))
+    points = row[0]
+
+    if points < amount:
+        conn.close()
+        return False
+
+    cur.execute(
+        "UPDATE users SET points = points - ? WHERE user_id=?",
+        (amount, user_id)
+    )
 
     conn.commit()
     conn.close()
