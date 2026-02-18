@@ -1,21 +1,12 @@
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from .buy import register_buy_handlers
+from .my_subs import register_my_sub_handlers
+from .points import register_points_handlers
+from .start import register_start_handler
 
 
-def register_start_handler(bot):
+def register_handlers(bot):
 
-    @bot.message_handler(commands=["start"])
-    def start(message):
-
-        markup = ReplyKeyboardMarkup(resize_keyboard=True)
-
-        markup.add(
-            KeyboardButton("🛒 خرید اشتراک"),
-            KeyboardButton("📦 اشتراک من"),
-            KeyboardButton("⭐ امتیازات من")
-        )
-
-        bot.send_message(
-            message.chat.id,
-            "به ربات خوش اومدی 🌹",
-            reply_markup=markup
-        )
+    register_start_handler(bot)
+    register_buy_handlers(bot)
+    register_my_sub_handlers(bot)
+    register_points_handlers(bot)
