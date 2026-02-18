@@ -8,11 +8,17 @@ def register_my_sub_handlers(bot):
         subs = get_subs(message.from_user.id)
 
         if not subs:
-            bot.send_message(message.chat.id, "اشتراکی نداری ❌")
+            bot.send_message(message.chat.id, "❌ اشتراکی نداری")
             return
 
-        text = ""
+        text = "📦 اشتراک های شما:\n\n"
+
         for s in subs:
-            text += f"\n{ s[0] } ماهه\nاز { s[1] }\nتا { s[2] }\n"
+            months, start, end, config = s
+            text += (
+                f"🔹 {months} ماهه\n"
+                f"📅 شروع: {start[:10]}\n"
+                f"📅 پایان: {end[:10]}\n\n"
+            )
 
         bot.send_message(message.chat.id, text)
