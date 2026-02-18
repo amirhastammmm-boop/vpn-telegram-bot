@@ -16,9 +16,9 @@ def register_my_sub_handlers(bot):
         for s in subs:
             months, start, end, config = s
             text += (
-                f"🔹 {months} ماهه\n"
-                f"📅 شروع: {start[:10]}\n"
-                f"📅 پایان: {end[:10]}\n\n"
+                f"{months} ماهه\n"
+                f"شروع: {start[:10]}\n"
+                f"پایان: {end[:10]}\n\n"
             )
 
         bot.send_message(message.chat.id, text)
