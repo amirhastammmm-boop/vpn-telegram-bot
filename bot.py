@@ -1,11 +1,10 @@
-from telebot import TeleBot
-import config
-from database import create_tables
+from telegram.ext import Application
+from config import BOT_TOKEN
 from handlers import register_handlers
 
-bot = TeleBot(config.BOT_TOKEN)
+app = Application.builder().token(BOT_TOKEN).build()
 
-create_tables()
-register_handlers(bot)
+register_handlers(app)
 
-bot.infinity_polling()
+if __name__ == "__main__":
+    app.run_polling()
