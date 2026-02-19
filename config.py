@@ -1,0 +1,7 @@
+import os
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+SUPPORT_USERNAME = "Amnbytry@"
+SECRET_KEY = "CHANGE_THIS_SECRET_KEY"
