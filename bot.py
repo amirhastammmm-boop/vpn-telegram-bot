@@ -1,20 +1,20 @@
 import logging
-import sqlite3
 import uuid
 from datetime import datetime, timedelta
 
 from telegram import (
     Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
     ReplyKeyboardMarkup,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    InputFile,
 )
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
+    MessageHandler,
     CallbackQueryHandler,
     ContextTypes,
-    MessageHandler,
     filters,
 )
 
@@ -22,173 +22,223 @@ TOKEN = "8443993110:AAH08NXvjcKty2XBHH13ecD8l5giSCD-ZF4"
 
 logging.basicConfig(level=logging.INFO)
 
-conn = sqlite3.connect("database.db", check_same_thread=False)
-cursor = conn.cursor()
+users = {}
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    user_id INTEGER PRIMARY KEY,
-    referral_code TEXT,
-    invited_by TEXT,
-    points INTEGER DEFAULT 0
-)
-""")
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS subscriptions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    sub_code TEXT,
-    expire_date TEXT
-)
-""")
-conn.commit()
-
+# ------------------ MAIN MENU ------------------
 
 def main_menu():
     keyboard = [
-        ["🛒 خرید اشتراک", "📦 اشتراک های من"],
-        ["🎁 امتیاز ها", "📚 آموزش"],
-        ["🆘 پشتیبانی"],
+        ["خرید اشتراک", "اشتراک‌های من"],
+        ["امتیازهای من", "آموزش"],
+        ["پشتیبانی"],
     ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    return ReplyKeyboardMarkup(
+        keyboard, resize_keyboard=True, one_time_keyboard=False
+    )
 
+# ------------------ START ------------------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    args = context.args
 
-    cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
-    user = cursor.fetchone()
-
-    if not user:
-        referral_code = str(uuid.uuid4())[:8]
-        invited_by = args[0] if args else None
-
-        cursor.execute(
-            "INSERT INTO users (user_id, referral_code, invited_by) VALUES (?, ?, ?)",
-            (user_id, referral_code, invited_by),
-        )
-        conn.commit()
-
-        if invited_by:
-            cursor.execute(
-                "UPDATE users SET points = points + 1 WHERE referral_code=?",
-                (invited_by,),
-            )
-            conn.commit()
+    if user_id not in users:
+        users[user_id] = {
+            "subscriptions": [],
+            "points": 0,
+            "referral_code": str(user_id),
+        }
 
     await update.message.reply_text(
-        "به ربات Payydar VPN خوش اومدی 👋",
+        "به ربات خوش آمدید 👋",
         reply_markup=main_menu()
     )
 
+# ------------------ BUY MENU ------------------
 
 async def buy_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [
-            InlineKeyboardButton("۱ ماهه", callback_data="buy_1"),
-            InlineKeyboardButton("۲ ماهه", callback_data="buy_2"),
-        ],
-        [InlineKeyboardButton("۳ ماهه", callback_data="buy_3")],
+        [InlineKeyboardButton("۱ ماهه | ۳۳GB | 130k", callback_data="plan_1")],
+        [InlineKeyboardButton("۲ ماهه | ۷۷GB | 260k", callback_data="plan_2")],
+        [InlineKeyboardButton("۳ ماهه | ۱۱۰GB | 390k", callback_data="plan_3")],
     ]
     await update.message.reply_text(
-        "پلن مورد نظر رو انتخاب کن:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        "یکی از پلن‌ها را انتخاب کنید:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
+# ------------------ CREATE SUB ------------------
 
-async def handle_buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+def create_subscription(user_id, months, volume):
+    sub_id = str(uuid.uuid4())[:8]
+    start = datetime.now()
+    end = start + timedelta(days=30 * months)
+
+    subscription = {
+        "id": sub_id,
+        "months": months,
+        "start": start,
+        "end": end,
+        "volume": volume,
+        "remaining": volume,
+    }
+
+    users[user_id]["subscriptions"].append(subscription)
+    return subscription
+
+# ------------------ CALLBACK ------------------
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     user_id = query.from_user.id
-    months = int(query.data.split("_")[1])
 
-    sub_code = str(uuid.uuid4())[:10]
-    expire = datetime.now() + timedelta(days=30 * months)
+    plans = {
+        "plan_1": (1, 33),
+        "plan_2": (2, 77),
+        "plan_3": (3, 110),
+    }
 
-    cursor.execute(
-        "INSERT INTO subscriptions (user_id, sub_code, expire_date) VALUES (?, ?, ?)",
-        (user_id, sub_code, expire.strftime("%Y-%m-%d")),
-    )
-    conn.commit()
+    if query.data in plans:
+        months, volume = plans[query.data]
 
-    await query.edit_message_text(
-        f"✅ اشتراک ساخته شد\n\n"
-        f"کد اشتراک:\n{sub_code}\n\n"
-        f"تاریخ انقضا: {expire.strftime('%Y-%m-%d')}"
-    )
+        sub = create_subscription(user_id, months, volume)
 
+        # فایل تستی به جای WireGuard
+        config_text = f"""
+TEST VPN CONFIG
+Subscription ID: {sub['id']}
+Start: {sub['start']}
+End: {sub['end']}
+Volume: {sub['volume']}GB
+"""
+
+        file_name = f"config_{sub['id']}.conf"
+        with open(file_name, "w") as f:
+            f.write(config_text)
+
+        await query.message.reply_document(
+            document=InputFile(file_name),
+            caption="اشتراک تستی شما ساخته شد ✅"
+        )
+
+        await query.message.reply_text(
+            "منوی اصلی 👇",
+            reply_markup=main_menu()
+        )
+
+    elif query.data == "use_points":
+        if users[user_id]["points"] >= 5:
+            users[user_id]["points"] -= 5
+            sub = create_subscription(user_id, 1, 33)
+
+            await query.message.reply_text(
+                "اشتراک رایگان با امتیاز ساخته شد ✅",
+                reply_markup=main_menu()
+            )
+        else:
+            await query.message.reply_text(
+                "امتیاز کافی ندارید ❌",
+                reply_markup=main_menu()
+            )
+
+# ------------------ MY SUBS ------------------
 
 async def my_subs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    cursor.execute(
-        "SELECT sub_code, expire_date FROM subscriptions WHERE user_id=?",
-        (user_id,),
-    )
-    subs = cursor.fetchall()
+    subs = users[user_id]["subscriptions"]
 
     if not subs:
-        await update.message.reply_text("❌ شما اشتراکی ندارید.")
+        await update.message.reply_text(
+            "هیچ اشتراکی ندارید ❌",
+            reply_markup=main_menu()
+        )
         return
 
-    text = "📦 اشتراک های شما:\n\n"
+    text = ""
     for s in subs:
-        text += f"کد: {s[0]}\nانقضا: {s[1]}\n\n"
-
-    await update.message.reply_text(text)
-
-
-async def points_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    cursor.execute(
-        "SELECT referral_code, points FROM users WHERE user_id=?",
-        (user_id,),
-    )
-    data = cursor.fetchone()
-
-    referral_code = data[0]
-    points = data[1]
-
-    text = f"""
-🎁 امتیاز شما: {points}
-
-کد رفرال شما:
-{referral_code}
-
-لینک دعوت شما:
-https://t.me/PayydarVpn_robot?start={referral_code}
-
-هر ۵ امتیاز = اشتراک رایگان
-هر ۸ امتیاز = اشتراک ویژه
+        days_left = (s["end"] - datetime.now()).days
+        text += f"""
+کد: {s['id']}
+مدت: {s['months']} ماه
+پایان: {s['end']}
+روز باقی‌مانده: {days_left}
+حجم کل: {s['volume']}GB
+---------------------
 """
 
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, reply_markup=main_menu())
 
+# ------------------ POINTS ------------------
 
-async def send_guide(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("📚 آموزش اتصال بعد از خرید ارسال می‌شود.")
+async def points(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user = users[user_id]
 
+    keyboard = [
+        [InlineKeyboardButton("دریافت اشتراک با امتیاز", callback_data="use_points")]
+    ]
+
+    text = f"""
+کد رفرال شما:
+{user['referral_code']}
+
+امتیاز فعلی: {user['points']}
+
+هر ۵ امتیاز = ۱ ماه رایگان
+"""
+
+    await update.message.reply_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+# ------------------ TRAINING ------------------
+
+async def training(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "آموزش استفاده:\n\n"
+        "1- اپ WireGuard را نصب کنید.\n"
+        "2- فایل کانفیگ را Import کنید.\n"
+        "3- روی Connect بزنید.\n",
+        reply_markup=main_menu()
+    )
+
+# ------------------ SUPPORT ------------------
 
 async def support(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🆘 پشتیبانی: @Amnbytry")
+    await update.message.reply_text(
+        "در صورت بروز مشکل به پشتیبانی پیام دهید:\nAmnbytry@",
+        reply_markup=main_menu()
+    )
 
+# ------------------ MESSAGE ROUTER ------------------
+
+async def router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if text == "خرید اشتراک":
+        await buy_menu(update, context)
+    elif text == "اشتراک‌های من":
+        await my_subs(update, context)
+    elif text == "امتیازهای من":
+        await points(update, context)
+    elif text == "آموزش":
+        await training(update, context)
+    elif text == "پشتیبانی":
+        await support(update, context)
+
+# ------------------ MAIN ------------------
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.Regex("🛒 خرید اشتراک"), buy_menu))
-    app.add_handler(MessageHandler(filters.Regex("📦 اشتراک های من"), my_subs))
-    app.add_handler(MessageHandler(filters.Regex("🎁 امتیاز ها"), points_menu))
-    app.add_handler(MessageHandler(filters.Regex("📚 آموزش"), send_guide))
-    app.add_handler(MessageHandler(filters.Regex("🆘 پشتیبانی"), support))
+    app.add_handler(CallbackQueryHandler(handle_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
 
-    app.add_handler(CallbackQueryHandler(handle_buy, pattern="buy_"))
-
+    print("Bot is running...")
     app.run_polling()
-
 
 if __name__ == "__main__":
     main()
